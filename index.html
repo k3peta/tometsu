@@ -1357,101 +1357,117 @@
         const cx = w / 2;
         const headTilt = (Math.random() - 0.5) * 8;
         const faceCx = cx + headTilt;
-        const headTop = 48;
-        const shoulderY = 248;
-        const hemY = 470;
+        const headTop = 22;
+        const shoulderY = 292;
+        const hemY = 476;
 
-        const aura = ctx.createRadialGradient(faceCx, 194, 30, faceCx, 194, 172);
+        const aura = ctx.createRadialGradient(faceCx, 206, 30, faceCx, 206, 184);
         aura.addColorStop(0, 'rgba(244,248,255,0.24)');
         aura.addColorStop(0.5, 'rgba(190,204,236,0.14)');
         aura.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = aura;
         ctx.beginPath();
-        ctx.ellipse(faceCx, 212, 130, 200, 0, 0, Math.PI * 2);
+        ctx.ellipse(faceCx, 224, 138, 214, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        const shroud = ctx.createLinearGradient(0, 170, 0, hemY);
+        const shroud = ctx.createLinearGradient(0, 214, 0, hemY);
         shroud.addColorStop(0, 'rgba(242,246,255,0)');
         shroud.addColorStop(0.18, 'rgba(226,234,252,0.78)');
         shroud.addColorStop(0.54, 'rgba(162,176,208,0.34)');
         shroud.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = shroud;
         ctx.beginPath();
-        ctx.moveTo(faceCx - 34, 214);
-        ctx.bezierCurveTo(cx - 76, 238, cx - 92, 326, cx - 88, hemY);
-        ctx.quadraticCurveTo(cx - 10, hemY + 18, cx, hemY - 4);
-        ctx.quadraticCurveTo(cx + 10, hemY + 18, cx + 88, hemY);
-        ctx.bezierCurveTo(cx + 92, 326, cx + 76, 238, faceCx + 34, 214);
+        ctx.moveTo(faceCx - 22, shoulderY - 22);
+        ctx.bezierCurveTo(cx - 58, shoulderY - 10, cx - 78, 360, cx - 74, hemY);
+        ctx.quadraticCurveTo(cx - 8, hemY + 18, cx, hemY - 3);
+        ctx.quadraticCurveTo(cx + 8, hemY + 18, cx + 74, hemY);
+        ctx.bezierCurveTo(cx + 78, 360, cx + 58, shoulderY - 10, faceCx + 22, shoulderY - 22);
         ctx.closePath();
         ctx.fill();
 
-        const headGlow = ctx.createRadialGradient(faceCx, 160, 12, faceCx, 160, 104);
+        const headGlow = ctx.createRadialGradient(faceCx, 174, 12, faceCx, 174, 126);
         headGlow.addColorStop(0, 'rgba(252,253,255,0.72)');
         headGlow.addColorStop(0.35, 'rgba(236,242,255,0.34)');
         headGlow.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = headGlow;
         ctx.beginPath();
-        ctx.ellipse(faceCx, 164, 86, 112, 0, 0, Math.PI * 2);
+        ctx.ellipse(faceCx, 178, 102, 136, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = 'rgba(246,248,255,0.84)';
         ctx.beginPath();
         ctx.moveTo(faceCx, headTop);
-        ctx.bezierCurveTo(faceCx - 78, 58, faceCx - 82, 196, faceCx - 34, 230);
-        ctx.quadraticCurveTo(faceCx, 248, faceCx + 34, 230);
-        ctx.bezierCurveTo(faceCx + 82, 194, faceCx + 78, 58, faceCx, headTop);
+        ctx.bezierCurveTo(faceCx - 96, 34, faceCx - 106, 228, faceCx - 40, 276);
+        ctx.quadraticCurveTo(faceCx, 300, faceCx + 40, 276);
+        ctx.bezierCurveTo(faceCx + 106, 228, faceCx + 96, 34, faceCx, headTop);
         ctx.closePath();
         ctx.fill();
 
-        for (const ex of [faceCx - 28, faceCx + 28]) {
-          const socket = ctx.createRadialGradient(ex, 154, 0, ex, 154, 26);
+        ctx.fillStyle = 'rgba(210,220,246,0.10)';
+        ctx.beginPath();
+        ctx.ellipse(faceCx, 116, 58, 34, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (const ex of [faceCx - 34, faceCx + 34]) {
+          const socket = ctx.createRadialGradient(ex, 170, 0, ex, 170, 34);
           socket.addColorStop(0, 'rgba(255,255,255,0.16)');
           socket.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = socket;
           ctx.beginPath();
-          ctx.ellipse(ex, 154, 18, 24, 0, 0, Math.PI * 2);
+          ctx.ellipse(ex, 170, 22, 30, 0, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = 'rgba(14,18,28,0.86)';
           ctx.beginPath();
-          ctx.ellipse(ex, 158, 11, 16, 0, 0, Math.PI * 2);
+          ctx.ellipse(ex, 176, 14, 21, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          const eyeGlow = ctx.createRadialGradient(ex, 150, 0, ex, 150, 12);
+          const eyeGlow = ctx.createRadialGradient(ex, 166, 0, ex, 166, 16);
           eyeGlow.addColorStop(0, 'rgba(246,250,255,0.34)');
           eyeGlow.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = eyeGlow;
           ctx.beginPath();
-          ctx.ellipse(ex - 1, 150, 8, 10, 0, 0, Math.PI * 2);
+          ctx.ellipse(ex - 1, 166, 10, 13, 0, 0, Math.PI * 2);
           ctx.fill();
         }
 
         ctx.fillStyle = 'rgba(18,20,28,0.36)';
         ctx.beginPath();
-        ctx.moveTo(faceCx, 158);
-        ctx.lineTo(faceCx - 8, 194);
-        ctx.lineTo(faceCx + 7, 194);
+        ctx.moveTo(faceCx, 176);
+        ctx.lineTo(faceCx - 10, 220);
+        ctx.lineTo(faceCx + 9, 220);
         ctx.closePath();
         ctx.fill();
 
         ctx.fillStyle = 'rgba(10,12,18,0.68)';
         ctx.beginPath();
-        ctx.ellipse(faceCx, 210, 16, 24, 0, 0, Math.PI * 2);
+        ctx.ellipse(faceCx, 238, 18, 30, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.strokeStyle = 'rgba(228,236,252,0.14)';
         ctx.lineWidth = 1.5;
         for (let i = -2; i <= 2; i++) {
           ctx.beginPath();
-          ctx.moveTo(faceCx + i * 6, 192);
-          ctx.lineTo(faceCx + i * 5, 226);
+          ctx.moveTo(faceCx + i * 7, 216);
+          ctx.lineTo(faceCx + i * 5, 254);
           ctx.stroke();
         }
+
+        ctx.fillStyle = 'rgba(22,26,38,0.18)';
+        ctx.beginPath();
+        ctx.ellipse(faceCx, 232, 42, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(30,36,52,0.12)';
+        ctx.beginPath();
+        ctx.ellipse(faceCx - 62, 216, 18, 34, 0.35, 0, Math.PI * 2);
+        ctx.ellipse(faceCx + 62, 216, 18, 34, -0.35, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.strokeStyle = 'rgba(210,220,246,0.08)';
         for (let i = 0; i < 9; i++) {
           const sx = cx + (Math.random() - 0.5) * 82;
-          const sy = 266 + Math.random() * 154;
+          const sy = 306 + Math.random() * 132;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
           ctx.lineTo(sx + (Math.random() - 0.5) * 24, sy + 86 + Math.random() * 50);
@@ -1859,8 +1875,8 @@
         this.tintMaterials = [];
         this.planeMaterials = [];
         this.baseOpacity = 0.36 + Math.random() * 0.06;
-        this.height = 1.6 + Math.random() * 0.14;
-        this.width = 0.86 + Math.random() * 0.08;
+        this.height = 1.82 + Math.random() * 0.16;
+        this.width = 1.02 + Math.random() * 0.1;
         this.swayPhase = Math.random() * Math.PI * 2;
         this.floatPhase = Math.random() * Math.PI * 2;
         this.creepSpeed = 1.1 + Math.random() * 0.25;
@@ -1874,9 +1890,9 @@
 
         const tex = makeBigHeadGhostTexture();
         const planeDefs = [
-          { rot: 0, scale: 1.0, opacity: 1.0, z: 0.0 },
-          { rot: Math.PI / 4.5, scale: 0.92, opacity: 0.66, z: -0.03 },
-          { rot: -Math.PI / 4.5, scale: 0.88, opacity: 0.5, z: 0.03 }
+          { rot: 0, scale: 1.08, opacity: 1.0, z: 0.0 },
+          { rot: Math.PI / 4.5, scale: 0.98, opacity: 0.66, z: -0.03 },
+          { rot: -Math.PI / 4.5, scale: 0.94, opacity: 0.5, z: 0.03 }
         ];
 
         planeDefs.forEach(def => {
