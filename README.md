@@ -28,7 +28,8 @@ After GitHub Pages is enabled, the game can be played here:
 ## Run Locally
 
 ```bash
-cd /Users/ys/Projects/shadow-cleaner
+git clone https://github.com/k3peta/tometsu.git
+cd tometsu
 python3 -m http.server 8000
 ```
 
