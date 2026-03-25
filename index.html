@@ -1052,6 +1052,61 @@
       return null;
     }
 
+    function findOpenWorldTarget(x, z, { avoidStairs = true, minPlayerDist = 0 } = {}) {
+      const start = w2t(x, z);
+      for (let radius = 0; radius < Math.max(ROWS, COLS); radius++) {
+        for (let dr = -radius; dr <= radius; dr++) {
+          for (let dc = -radius; dc <= radius; dc++) {
+            if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
+            const c = start.c + dc;
+            const r = start.r + dr;
+            if (isWall(c, r)) continue;
+            if (avoidStairs && c === currentFloor.stairTile.c && r === currentFloor.stairTile.r) continue;
+            const pos = t2w(c, r);
+            if (minPlayerDist > 0 && Math.hypot(pos.x - camera.position.x, pos.z - camera.position.z) < minPlayerDist) continue;
+            return pos;
+          }
+        }
+      }
+      return null;
+    }
+
+    function findBehindPlayerWorldTarget(playerPos, playerDir, minDist = 1.8, maxDist = 4.8) {
+      if (!playerDir) return null;
+      const forward = playerDir.clone();
+      forward.y = 0;
+      if (forward.lengthSq() < 0.0001) return null;
+      forward.normalize();
+      const side = new THREE.Vector3(-forward.z, 0, forward.x);
+      const offsets = [];
+      const dists = [maxDist, (minDist + maxDist) * 0.5, minDist];
+      for (const dist of dists) {
+        offsets.push({ dist, side: 0 });
+        offsets.push({ dist, side: 1.1 });
+        offsets.push({ dist, side: -1.1 });
+        offsets.push({ dist, side: 1.9 });
+        offsets.push({ dist, side: -1.9 });
+      }
+      for (const offset of offsets) {
+        const tx = playerPos.x - forward.x * offset.dist + side.x * offset.side;
+        const tz = playerPos.z - forward.z * offset.dist + side.z * offset.side;
+        const pos = findOpenWorldTarget(tx, tz, { minPlayerDist: minDist * 0.7 });
+        if (pos) return pos;
+      }
+      return null;
+    }
+
+    function findGirlRetreatTarget(origin, playerPos) {
+      const phaseTarget = findFigurePhaseTarget(origin, playerPos);
+      if (phaseTarget) return phaseTarget;
+      const fallback = findOpenWorldTarget(
+        origin.x + (Math.random() - 0.5) * 8,
+        origin.z + (Math.random() - 0.5) * 8,
+        { minPlayerDist: 4.5 }
+      );
+      return fallback ? { x: fallback.x, z: fallback.z } : null;
+    }
+
     function makeShadowFigureTexture() {
       const tex = makeCanvas(256, 512, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
@@ -1168,6 +1223,128 @@
           ctx.lineTo(cx - 48 + Math.random() * 96, sy + 24 + Math.random() * 50);
           ctx.stroke();
         }
+      });
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    function makeLittleGirlGhostTexture() {
+      const tex = makeCanvas(256, 512, (ctx, w, h) => {
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        const headTilt = (Math.random() - 0.5) * 10;
+        const shoulderY = 152;
+        const hemY = 444 + Math.random() * 10;
+        const dressW = 66 + Math.random() * 12;
+
+        const aura = ctx.createRadialGradient(cx, 240, 18, cx, 240, 160);
+        aura.addColorStop(0, 'rgba(236,242,255,0.20)');
+        aura.addColorStop(0.45, 'rgba(184,198,230,0.12)');
+        aura.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.ellipse(cx, 248, 110, 184, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const hair = ctx.createLinearGradient(0, 72, 0, 228);
+        hair.addColorStop(0, 'rgba(30,34,48,0)');
+        hair.addColorStop(0.2, 'rgba(22,24,34,0.92)');
+        hair.addColorStop(0.82, 'rgba(4,4,8,0.88)');
+        hair.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hair;
+        ctx.beginPath();
+        ctx.moveTo(cx + headTilt, 64);
+        ctx.bezierCurveTo(cx - 52, 84, cx - 62, 176, cx - 42, 236);
+        ctx.quadraticCurveTo(cx - 8, 214, cx + headTilt, 214);
+        ctx.quadraticCurveTo(cx + 14, 214, cx + 42, 236);
+        ctx.bezierCurveTo(cx + 64, 170, cx + 54, 86, cx + headTilt, 64);
+        ctx.closePath();
+        ctx.fill();
+
+        const faceGlow = ctx.createRadialGradient(cx + headTilt, 142, 8, cx + headTilt, 142, 56);
+        faceGlow.addColorStop(0, 'rgba(250,252,255,0.54)');
+        faceGlow.addColorStop(0.4, 'rgba(232,238,250,0.28)');
+        faceGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = faceGlow;
+        ctx.beginPath();
+        ctx.ellipse(cx + headTilt, 144, 40, 58, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(244,246,255,0.78)';
+        ctx.beginPath();
+        ctx.moveTo(cx + headTilt, 82);
+        ctx.bezierCurveTo(cx - 36, 92, cx - 44, 154, cx - 20, 194);
+        ctx.quadraticCurveTo(cx + headTilt, 212, cx + 20, 194);
+        ctx.bezierCurveTo(cx + 42, 154, cx + 36, 92, cx + headTilt, 82);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(22,24,34,0.82)';
+        for (const ex of [cx + headTilt - 14, cx + headTilt + 14]) {
+          ctx.beginPath();
+          ctx.ellipse(ex, 144, 8, 13, 0, 0, Math.PI * 2);
+          ctx.fill();
+          const glowEye = ctx.createRadialGradient(ex, 140, 0, ex, 140, 12);
+          glowEye.addColorStop(0, 'rgba(236,242,255,0.34)');
+          glowEye.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = glowEye;
+          ctx.beginPath();
+          ctx.ellipse(ex, 140, 9, 12, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(22,24,34,0.82)';
+        }
+
+        ctx.fillStyle = 'rgba(16,18,26,0.38)';
+        ctx.beginPath();
+        ctx.moveTo(cx + headTilt, 150);
+        ctx.lineTo(cx + headTilt - 6, 176);
+        ctx.lineTo(cx + headTilt + 5, 176);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(12,14,20,0.56)';
+        ctx.beginPath();
+        ctx.ellipse(cx + headTilt, 188, 10, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const dress = ctx.createLinearGradient(0, shoulderY, 0, hemY);
+        dress.addColorStop(0, 'rgba(236,242,255,0.04)');
+        dress.addColorStop(0.14, 'rgba(226,234,252,0.84)');
+        dress.addColorStop(0.58, 'rgba(160,170,202,0.38)');
+        dress.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = dress;
+        ctx.beginPath();
+        ctx.moveTo(cx + headTilt - 28, shoulderY);
+        ctx.bezierCurveTo(cx - dressW * 0.64, 176, cx - dressW - 8, 258, cx - dressW, hemY);
+        ctx.quadraticCurveTo(cx - 16, hemY + 18, cx + headTilt, hemY - 4);
+        ctx.quadraticCurveTo(cx + 18, hemY + 18, cx + dressW, hemY);
+        ctx.bezierCurveTo(cx + dressW + 8, 260, cx + dressW * 0.64, 174, cx + headTilt + 28, shoulderY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(214,224,248,0.10)';
+        for (let i = 0; i < 7; i++) {
+          const sx = cx + (Math.random() - 0.5) * 54;
+          const sy = 210 + Math.random() * 160;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + (Math.random() - 0.5) * 18, sy + 80 + Math.random() * 58);
+          ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        for (let i = 0; i < 5; i++) {
+          const cutX = cx - dressW * 0.65 + Math.random() * dressW * 1.3;
+          ctx.beginPath();
+          ctx.moveTo(cutX, hemY - 10 + Math.random() * 10);
+          ctx.lineTo(cutX + 8 + Math.random() * 8, h);
+          ctx.lineTo(cutX - 8 - Math.random() * 8, h);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
       });
       tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.needsUpdate = true;
@@ -1338,6 +1515,216 @@
       }
     }
 
+    class ShadowGirlGhost {
+      constructor(x, z, rotY) {
+        this.group = new THREE.Group();
+        this.visual = new THREE.Group();
+        this.group.add(this.visual);
+        this.materials = [];
+        this.tintMaterials = [];
+        this.planeMaterials = [];
+        this.baseOpacity = 0.38 + Math.random() * 0.08;
+        this.height = 1.34 + Math.random() * 0.12;
+        this.width = 0.58 + Math.random() * 0.08;
+        this.swayPhase = Math.random() * Math.PI * 2;
+        this.floatPhase = Math.random() * Math.PI * 2;
+        this.creepSpeed = 2.4 + Math.random() * 0.35;
+        this.relocateCooldown = 0.7 + Math.random() * 1.2;
+        this.reappearing = false;
+        this.retreating = false;
+        this.retreatProgress = 0;
+        this.retreatDuration = 0.46;
+        this.retreatStart = new THREE.Vector3();
+        this.retreatTarget = new THREE.Vector3();
+
+        const girlTex = makeLittleGirlGhostTexture();
+        const planeDefs = [
+          { rot: 0, scale: 1.0, opacity: 1.0, z: 0.0 },
+          { rot: Math.PI / 4, scale: 0.9, opacity: 0.68, z: -0.02 },
+          { rot: -Math.PI / 4, scale: 0.86, opacity: 0.52, z: 0.02 }
+        ];
+
+        planeDefs.forEach(def => {
+          const mat = new THREE.MeshBasicMaterial({
+            map: girlTex,
+            color: 0xffffff,
+            transparent: true,
+            opacity: this.baseOpacity * def.opacity,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            alphaTest: 0.02
+          });
+          const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(this.width * def.scale, this.height * (0.98 + def.scale * 0.04)),
+            mat
+          );
+          plane.position.set(0, this.height * 0.5, def.z);
+          plane.rotation.y = def.rot;
+          this.visual.add(plane);
+          this.materials.push(mat);
+          this.planeMaterials.push({ mat, baseOpacity: this.baseOpacity * def.opacity });
+          this.tintMaterials.push(mat);
+        });
+
+        const auraMat = new THREE.MeshBasicMaterial({
+          map: girlTex,
+          color: 0xa2aec7,
+          transparent: true,
+          opacity: 0.12,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          alphaTest: 0.01
+        });
+        const aura = new THREE.Mesh(new THREE.PlaneGeometry(this.width * 1.34, this.height * 1.1), auraMat);
+        aura.position.set(0, this.height * 0.54, 0);
+        aura.rotation.y = Math.PI / 4;
+        this.visual.add(aura);
+        this.materials.push(auraMat);
+        this.auraMat = auraMat;
+        this.auraBaseOpacity = auraMat.opacity;
+
+        const floorShadowMat = new THREE.MeshBasicMaterial({
+          color: 0x040408,
+          transparent: true,
+          opacity: 0.16,
+          depthWrite: false
+        });
+        const floorShadow = new THREE.Mesh(new THREE.CircleGeometry(0.26, 18), floorShadowMat);
+        floorShadow.rotation.x = -Math.PI / 2;
+        floorShadow.position.y = 0.02;
+        floorShadow.scale.set(0.9, 0.62, 1);
+        this.group.add(floorShadow);
+        this.materials.push(floorShadowMat);
+        this.floorShadowMat = floorShadowMat;
+        this.floorShadowBaseOpacity = floorShadowMat.opacity;
+
+        this.group.position.set(x, 0, z);
+        this.group.rotation.y = rotY;
+        this.alive = true;
+        this.hp = 0.65;
+        this.hitTimer = 0;
+        currentFloor.enemyGroup.add(this.group);
+      }
+      get mesh() { return this.group; }
+      canBeSeen(playerPos, playerDir) {
+        if (!playerDir) return false;
+        const toGhost = this.group.position.clone().sub(playerPos);
+        const dist = toGhost.length();
+        if (dist > 8.5 || dist < 0.001) return false;
+        toGhost.normalize();
+        return playerDir.dot(toGhost) > 0.52 && hasLineOfSight(playerPos, this.group.position);
+      }
+      repositionBehindPlayer(playerPos, playerDir, minDist = 3.2, maxDist = 5.6) {
+        const target = findBehindPlayerWorldTarget(playerPos, playerDir, minDist, maxDist);
+        if (!target) return false;
+        this.group.position.set(
+          target.x + (Math.random() - 0.5) * 0.18,
+          0,
+          target.z + (Math.random() - 0.5) * 0.18
+        );
+        this.group.rotation.y = Math.atan2(playerPos.x - this.group.position.x, playerPos.z - this.group.position.z);
+        this.reappearing = true;
+        this.relocateCooldown = 1.4 + Math.random() * 1.8;
+        return true;
+      }
+      startRetreat(playerPos) {
+        const target = findGirlRetreatTarget(this.group.position, playerPos);
+        if (!target) return;
+        this.retreating = true;
+        this.retreatProgress = 0;
+        this.retreatStart.copy(this.group.position);
+        this.retreatTarget.set(target.x, 0, target.z);
+        this.relocateCooldown = 1.6 + Math.random() * 1.8;
+      }
+      update(dt, playerPos, playerDir) {
+        if (!this.alive) return;
+
+        const seen = this.canBeSeen(playerPos, playerDir);
+        if (seen && !this.retreating) this.startRetreat(playerPos);
+
+        if (this.retreating) {
+          this.retreatProgress = Math.min(1, this.retreatProgress + dt / this.retreatDuration);
+          const eased = 0.5 - Math.cos(this.retreatProgress * Math.PI) * 0.5;
+          this.group.position.lerpVectors(this.retreatStart, this.retreatTarget, eased);
+          this.group.rotation.y = Math.atan2(this.retreatTarget.x - this.retreatStart.x, this.retreatTarget.z - this.retreatStart.z);
+          if (this.retreatProgress >= 1) {
+            this.retreating = false;
+            this.reappearing = true;
+          }
+        } else {
+          this.relocateCooldown -= dt;
+          const toPlayer = playerPos.clone().sub(this.group.position);
+          const dist = toPlayer.length();
+          if (playerDir && !seen && (dist > 6.6 || this.relocateCooldown <= 0)) {
+            this.repositionBehindPlayer(playerPos, playerDir, 3.6, 6.2);
+          } else if (playerDir && !seen) {
+            const desired = findBehindPlayerWorldTarget(playerPos, playerDir, 1.25, 2.25);
+            if (desired) {
+              const dx = desired.x - this.group.position.x;
+              const dz = desired.z - this.group.position.z;
+              const len = Math.hypot(dx, dz);
+              if (len > 0.05) {
+                const step = Math.min(len, this.creepSpeed * dt);
+                const nx = this.group.position.x + dx / len * step;
+                const nz = this.group.position.z + dz / len * step;
+                if (canMove(nx, nz)) {
+                  this.group.position.x = nx;
+                  this.group.position.z = nz;
+                }
+                this.group.rotation.y = Math.atan2(dx, dz);
+              }
+            }
+          }
+        }
+
+        this.swayPhase += dt * 2.4;
+        this.floatPhase += dt * 2.9;
+        const retreatPulse = this.retreating ? Math.sin(this.retreatProgress * Math.PI) : 0;
+        const appearFade = this.reappearing ? Math.max(0, 1 - this.relocateCooldown * 0.35) : 1;
+        if (this.relocateCooldown < 1.1) this.reappearing = false;
+        this.visual.rotation.z = Math.sin(this.swayPhase) * 0.028 + retreatPulse * 0.08;
+        this.visual.position.y = Math.sin(this.floatPhase) * 0.04 + retreatPulse * 0.12;
+        this.visual.scale.x = 1 + Math.sin(this.swayPhase * 0.75) * 0.02 + retreatPulse * 0.05;
+        this.visual.scale.y = 1 + Math.cos(this.floatPhase * 0.9) * 0.03 + retreatPulse * 0.08;
+
+        const alphaMul = (this.retreating ? 0.34 : 1) * THREE.MathUtils.clamp(appearFade, 0.45, 1);
+        this.planeMaterials.forEach(layer => {
+          layer.mat.opacity = layer.baseOpacity * alphaMul;
+        });
+        this.auraMat.opacity = this.auraBaseOpacity * (this.retreating ? 2.6 : 1.2) * alphaMul;
+        this.floorShadowMat.opacity = this.floorShadowBaseOpacity * (this.retreating ? 0.35 : 1) * alphaMul;
+
+        if (this.hitTimer > 0) {
+          this.hitTimer -= dt;
+          this.tintMaterials.forEach(mat => { mat.color.setHex(0xffa0a0); });
+        } else {
+          this.tintMaterials.forEach(mat => { mat.color.setHex(0xffffff); });
+        }
+      }
+      hit(dmg) {
+        if (!this.alive) return;
+        this.hp -= dmg;
+        this.hitTimer = 0.22;
+        this.startRetreat(camera.position);
+        if (this.hp <= 0) this.destroy();
+      }
+      destroy() {
+        if (!this.alive) return;
+        this.alive = false;
+        const mats = [...new Set(this.materials)];
+        let t = 0;
+        const fade = () => {
+          t += 0.02;
+          mats.forEach(m => { m.opacity *= 0.89; });
+          this.visual.scale.multiplyScalar(0.986);
+          if (t < 1) requestAnimationFrame(fade);
+          else removeObject(this.group);
+        };
+        fade();
+        score += 2;
+      }
+    }
+
     // Spawn figures: clusters in generated rooms
     function buildFigureSpawnCandidates() {
       const roomTiles = [];
@@ -1385,15 +1772,21 @@
     function spawnFigures(count) {
       const candidates = buildFigureSpawnCandidates();
       const placed = [];
+      let girlsPlaced = 0;
+      const girlTarget = count >= 3 ? Math.max(1, Math.round(count * 0.28)) : 0;
       for (const cand of candidates) {
         if (placed.length >= count) break;
         if (placed.some(p => Math.abs(p.c - cand.c) <= 1 && Math.abs(p.r - cand.r) <= 1)) continue;
         const { x, z } = t2w(cand.c, cand.r);
-        figures.push(new ShadowFigure(
-          x + (Math.random() - 0.5) * cand.jitter,
-          z + (Math.random() - 0.5) * cand.jitter,
-          Math.random() * Math.PI * 2
-        ));
+        const spawnX = x + (Math.random() - 0.5) * cand.jitter;
+        const spawnZ = z + (Math.random() - 0.5) * cand.jitter;
+        const spawnRot = Math.random() * Math.PI * 2;
+        const useGirl = girlsPlaced < girlTarget && (placed.length === 0 || Math.random() < 0.45);
+        figures.push(useGirl
+          ? new ShadowGirlGhost(spawnX, spawnZ, spawnRot)
+          : new ShadowFigure(spawnX, spawnZ, spawnRot)
+        );
+        if (useGirl) girlsPlaced++;
         placed.push(cand);
       }
       return placed.length;
@@ -1497,6 +1890,15 @@
         ctx.closePath();
         ctx.fill();
 
+        const skinMottle = ctx.createRadialGradient(faceCX, 162, 14, faceCX, 164, 92);
+        skinMottle.addColorStop(0, 'rgba(190,202,228,0.10)');
+        skinMottle.addColorStop(0.55, 'rgba(112,126,156,0.08)');
+        skinMottle.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = skinMottle;
+        ctx.beginPath();
+        ctx.ellipse(faceCX, 166, 74, 96, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         const brow = ctx.createLinearGradient(0, faceTop + 14, 0, faceTop + 84);
         brow.addColorStop(0, 'rgba(112,124,158,0.18)');
         brow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1518,6 +1920,11 @@
 
         const eyeY = 138;
         for (const ex of [faceCX - 28, faceCX + 28]) {
+          ctx.fillStyle = 'rgba(214,224,248,0.12)';
+          ctx.beginPath();
+          ctx.ellipse(ex, eyeY - 12, 19, 9, 0, 0, Math.PI * 2);
+          ctx.fill();
+
           const socketAura = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, 26);
           socketAura.addColorStop(0, 'rgba(255,255,255,0.16)');
           socketAura.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1529,6 +1936,11 @@
           ctx.fillStyle = 'rgba(18,22,32,0.80)';
           ctx.beginPath();
           ctx.ellipse(ex, eyeY + 2, 12, 18, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(42,48,66,0.24)';
+          ctx.beginPath();
+          ctx.ellipse(ex, eyeY + 17, 13, 6, 0, 0, Math.PI * 2);
           ctx.fill();
 
           if (closedEyes) {
@@ -1545,6 +1957,11 @@
             ctx.fillStyle = pupilGlow;
             ctx.beginPath();
             ctx.ellipse(ex, eyeY - 4, 7, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(244,248,255,0.26)';
+            ctx.beginPath();
+            ctx.ellipse(ex - 2, eyeY - 7, 2.2, 3.8, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -1566,6 +1983,13 @@
         ctx.ellipse(faceCX - 8, 190, 4, 7, -0.15, 0, Math.PI * 2);
         ctx.ellipse(faceCX + 8, 190, 4, 7, 0.15, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.strokeStyle = 'rgba(212,222,244,0.14)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(faceCX, 152);
+        ctx.quadraticCurveTo(faceCX + 4, 172, faceCX + 2, 194);
+        ctx.stroke();
 
         const mouthY = 210 + Math.random() * 8;
         if (closedEyes) {
@@ -1590,6 +2014,13 @@
           ctx.ellipse(faceCX, mouthY + 8, 13, 20, 0, 0, Math.PI * 2);
           ctx.fill();
 
+          ctx.strokeStyle = 'rgba(216,224,244,0.16)';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(faceCX - 16, mouthY + 3);
+          ctx.quadraticCurveTo(faceCX, mouthY - 2, faceCX + 16, mouthY + 3);
+          ctx.stroke();
+
           ctx.strokeStyle = 'rgba(236,242,255,0.18)';
           ctx.lineWidth = 1.4;
           for (let i = -2; i <= 2; i++) {
@@ -1598,6 +2029,31 @@
             ctx.lineTo(faceCX + i * 4, mouthY + 18);
             ctx.stroke();
           }
+        }
+
+        const cheekBones = ctx.createLinearGradient(0, 132, 0, 236);
+        cheekBones.addColorStop(0, 'rgba(0,0,0,0)');
+        cheekBones.addColorStop(0.35, 'rgba(88,102,136,0.08)');
+        cheekBones.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.strokeStyle = cheekBones;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(faceCX - 46, 168);
+        ctx.quadraticCurveTo(faceCX - 62, 196, faceCX - 28, 224);
+        ctx.moveTo(faceCX + 46, 168);
+        ctx.quadraticCurveTo(faceCX + 62, 196, faceCX + 28, 224);
+        ctx.stroke();
+
+        for (let i = 0; i < 18; i++) {
+          const px = faceCX + (Math.random() - 0.5) * 96;
+          const py = 108 + Math.random() * 124;
+          const pore = ctx.createRadialGradient(px, py, 0, px, py, 8 + Math.random() * 6);
+          pore.addColorStop(0, `rgba(80,94,126,${0.02 + Math.random() * 0.03})`);
+          pore.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = pore;
+          ctx.beginPath();
+          ctx.arc(px, py, 8 + Math.random() * 6, 0, Math.PI * 2);
+          ctx.fill();
         }
 
         ctx.strokeStyle = 'rgba(226,234,248,0.09)';
@@ -2068,9 +2524,9 @@
     }
 
     const BOSS_TYPES = {
-      snake: { segments:14, headSize:0.45, taper:0.85, speed:1.2, hp:4, color:0xe5eeff },
-      lizard:{ segments:10, headSize:0.5, taper:0.8, speed:0.8, hp:5, color:0xe6f4ea, legs:true },
-      bird:  { segments:8, headSize:0.4, taper:0.9, speed:1.8, hp:3, color:0xf0e8ff, wings:true },
+      snake: { segments:14, headSize:0.45, taper:0.85, speed:1.2, hp:2, color:0xe5eeff },
+      lizard:{ segments:10, headSize:0.5, taper:0.8, speed:0.8, hp:2.5, color:0xe6f4ea, legs:true },
+      bird:  { segments:8, headSize:0.4, taper:0.9, speed:1.8, hp:1.5, color:0xf0e8ff, wings:true },
     };
     class ShadowBoss {
       constructor(wf, type) {
@@ -2804,7 +3260,7 @@
         mmCanvas.style.opacity = (0.3 + batteryLife * 0.7).toFixed(2);
         const pDir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
         shadows.forEach(s => s.update(dt, camera.position, pDir));
-        figures.forEach(f => f.update(dt, camera.position));
+        figures.forEach(f => f.update(dt, camera.position, pDir));
         bosses.forEach(b => b.update(dt));
         updateHUD(); checkClear(); drawMinimap(); updateStairsPrompt();
         if ((performance.now()-startTime)/1000 > 5) instructionsEl.style.opacity = '0';
