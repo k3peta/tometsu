@@ -1896,9 +1896,13 @@
         this.width = 0.58 + Math.random() * 0.08;
         this.swayPhase = Math.random() * Math.PI * 2;
         this.floatPhase = Math.random() * Math.PI * 2;
-        this.creepSpeed = 2.4 + Math.random() * 0.35;
-        this.relocateCooldown = 0.7 + Math.random() * 1.2;
+        this.creepSpeed = 1.95 + Math.random() * 0.28;
+        this.relocateCooldown = 1.8 + Math.random() * 1.6;
         this.reappearing = false;
+        this.lingering = false;
+        this.lingerTimer = 0;
+        this.lingerDuration = 28 + Math.random() * 5;
+        this.closeHoldDistance = 1.35 + Math.random() * 0.18;
         this.retreating = false;
         this.retreatProgress = 0;
         this.retreatDuration = 0.46;
@@ -1992,12 +1996,21 @@
         );
         this.group.rotation.y = Math.atan2(playerPos.x - this.group.position.x, playerPos.z - this.group.position.z);
         this.reappearing = true;
-        this.relocateCooldown = 1.4 + Math.random() * 1.8;
+        this.lingering = false;
+        this.lingerTimer = 0;
+        this.relocateCooldown = 2.4 + Math.random() * 2.4;
         return true;
+      }
+      beginLingering() {
+        this.lingering = true;
+        this.lingerTimer = this.lingerDuration;
+        this.relocateCooldown = 0.6 + Math.random() * 0.7;
       }
       startRetreat(playerPos) {
         const target = findGirlRetreatTarget(this.group.position, playerPos);
         if (!target) return;
+        this.lingering = false;
+        this.lingerTimer = 0;
         this.retreating = true;
         this.retreatProgress = 0;
         this.retreatStart.copy(this.group.position);
@@ -2008,7 +2021,6 @@
         if (!this.alive) return;
 
         const seen = this.canBeSeen(playerPos, playerDir);
-        if (seen && !this.retreating) this.startRetreat(playerPos);
 
         if (this.retreating) {
           this.retreatProgress = Math.min(1, this.retreatProgress + dt / this.retreatDuration);
@@ -2023,9 +2035,23 @@
           this.relocateCooldown -= dt;
           const toPlayer = playerPos.clone().sub(this.group.position);
           const dist = toPlayer.length();
-          if (playerDir && !seen && (dist > 6.6 || this.relocateCooldown <= 0)) {
-            this.repositionBehindPlayer(playerPos, playerDir, 3.6, 6.2);
-          } else if (playerDir && !seen) {
+          if (this.lingering) {
+            this.lingerTimer -= dt;
+            const lookX = playerPos.x - this.group.position.x;
+            const lookZ = playerPos.z - this.group.position.z;
+            if (Math.hypot(lookX, lookZ) > 0.01) {
+              this.group.rotation.y = Math.atan2(lookX, lookZ);
+            }
+            if (this.lingerTimer <= 0 && playerDir) {
+              if (!this.repositionBehindPlayer(playerPos, playerDir, 3.6, 6.4)) {
+                this.startRetreat(playerPos);
+              }
+            }
+          } else if (dist <= this.closeHoldDistance) {
+            this.beginLingering();
+          } else if (playerDir && !seen && (dist > 6.9 || this.relocateCooldown <= 0)) {
+            this.repositionBehindPlayer(playerPos, playerDir, 3.8, 6.4);
+          } else if (playerDir) {
             const desired = findBehindPlayerWorldTarget(playerPos, playerDir, 1.25, 2.25);
             if (desired) {
               const dx = desired.x - this.group.position.x;
@@ -2040,6 +2066,7 @@
                   this.group.position.z = nz;
                 }
                 this.group.rotation.y = Math.atan2(dx, dz);
+                if (dist <= this.closeHoldDistance + 0.12) this.beginLingering();
               }
             }
           }
@@ -2048,19 +2075,20 @@
         this.swayPhase += dt * 2.4;
         this.floatPhase += dt * 2.9;
         const retreatPulse = this.retreating ? Math.sin(this.retreatProgress * Math.PI) : 0;
+        const lingerPulse = this.lingering ? 0.45 + Math.sin(ambienceTime * 1.7 + this.floatPhase) * 0.08 : 0;
         const appearFade = this.reappearing ? Math.max(0, 1 - this.relocateCooldown * 0.35) : 1;
         if (this.relocateCooldown < 1.1) this.reappearing = false;
-        this.visual.rotation.z = Math.sin(this.swayPhase) * 0.028 + retreatPulse * 0.08;
-        this.visual.position.y = Math.sin(this.floatPhase) * 0.04 + retreatPulse * 0.12;
-        this.visual.scale.x = 1 + Math.sin(this.swayPhase * 0.75) * 0.02 + retreatPulse * 0.05;
-        this.visual.scale.y = 1 + Math.cos(this.floatPhase * 0.9) * 0.03 + retreatPulse * 0.08;
+        this.visual.rotation.z = Math.sin(this.swayPhase) * (this.lingering ? 0.016 : 0.028) + retreatPulse * 0.08;
+        this.visual.position.y = Math.sin(this.floatPhase) * (this.lingering ? 0.024 : 0.04) + retreatPulse * 0.12 + lingerPulse * 0.03;
+        this.visual.scale.x = 1 + Math.sin(this.swayPhase * 0.75) * 0.02 + retreatPulse * 0.05 - lingerPulse * 0.018;
+        this.visual.scale.y = 1 + Math.cos(this.floatPhase * 0.9) * 0.03 + retreatPulse * 0.08 + lingerPulse * 0.026;
 
-        const alphaMul = (this.retreating ? 0.34 : 1) * THREE.MathUtils.clamp(appearFade, 0.45, 1);
+        const alphaMul = (this.retreating ? 0.34 : this.lingering ? 1.08 : 1) * THREE.MathUtils.clamp(appearFade, 0.45, 1);
         this.planeMaterials.forEach(layer => {
           layer.mat.opacity = layer.baseOpacity * alphaMul;
         });
-        this.auraMat.opacity = this.auraBaseOpacity * (this.retreating ? 2.6 : 1.2) * alphaMul;
-        this.floorShadowMat.opacity = this.floorShadowBaseOpacity * (this.retreating ? 0.35 : 1) * alphaMul;
+        this.auraMat.opacity = this.auraBaseOpacity * (this.retreating ? 2.6 : this.lingering ? 1.7 : 1.2) * alphaMul;
+        this.floorShadowMat.opacity = this.floorShadowBaseOpacity * (this.retreating ? 0.35 : this.lingering ? 1.18 : 1) * alphaMul;
 
         if (this.hitTimer > 0) {
           this.hitTimer -= dt;
@@ -3337,7 +3365,172 @@
     let audioCtx;
     let bgmSource = null;
     let bgmGain = null;
+    let bgmLayers = null;
     let bgmStopHandle = 0;
+    let scareAudioClock = 0;
+    let nextWhisperCueAt = 0;
+    let nextFootstepCueAt = 0;
+
+    function connectAudioChain(output, input) {
+      if (!output || !input) return;
+      output.connect(input);
+    }
+
+    function createNoiseBuffer(ctx, seconds = 4) {
+      const sr = ctx.sampleRate;
+      const buf = ctx.createBuffer(2, sr * seconds, sr);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = buf.getChannelData(ch);
+        for (let i = 0; i < d.length; i++) {
+          const t = i / sr;
+          const syl = Math.sin(t * 3.5) * 0.5 + 0.5;
+          const br = Math.sin(t * 1.2 + ch) * 0.3 + 0.7;
+          d[i] = (Math.random() * 2 - 1) * syl * br * 0.15;
+        }
+      }
+      return buf;
+    }
+
+    function nearestThreatCue(from, playerDir) {
+      let nearest = null;
+      let min = Infinity;
+      const consider = pos => {
+        if (!pos) return;
+        const d = from.distanceTo(pos);
+        if (d < min) {
+          min = d;
+          nearest = pos;
+        }
+      };
+      shadows.forEach(s => { if (s.alive) consider(s.mesh.position); });
+      figures.forEach(f => { if (f.alive) consider(f.group.position); });
+      bosses.forEach(b => { if (b.alive) consider(b.segments[0].position); });
+      if (!nearest) return { distance: Infinity, pan: 0 };
+
+      const toThreat = nearest.clone().sub(from);
+      toThreat.y = 0;
+      const len = toThreat.length();
+      if (len < 0.001) return { distance: 0, pan: 0 };
+      toThreat.divideScalar(len);
+      const flatDir = playerDir ? playerDir.clone() : new THREE.Vector3(0, 0, -1);
+      flatDir.y = 0;
+      if (flatDir.lengthSq() < 0.001) flatDir.set(0, 0, -1);
+      flatDir.normalize();
+      const right = new THREE.Vector3().crossVectors(flatDir, new THREE.Vector3(0, 1, 0)).normalize();
+      return {
+        distance: min,
+        pan: THREE.MathUtils.clamp(right.dot(toThreat), -0.95, 0.95)
+      };
+    }
+
+    function triggerWhisperCue(pan, intensity) {
+      if (!audioCtx || !bgmLayers) return;
+      const now = audioCtx.currentTime;
+      const src = audioCtx.createBufferSource();
+      src.buffer = bgmLayers.noiseBuffer;
+      src.playbackRate.value = 0.72 + Math.random() * 0.18;
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 700 + Math.random() * 340;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1200 + Math.random() * 900;
+      bp.Q.value = 1.4;
+      const gain = audioCtx.createGain();
+      const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+      const level = 0.018 + intensity * 0.055;
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(level, now + 0.06);
+      gain.gain.exponentialRampToValueAtTime(level * 0.5, now + 0.24);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
+
+      if (panner) {
+        panner.pan.setValueAtTime(pan * 0.85, now);
+      }
+
+      connectAudioChain(src, hp);
+      connectAudioChain(hp, bp);
+      connectAudioChain(bp, gain);
+      if (panner) {
+        connectAudioChain(gain, panner);
+        connectAudioChain(panner, bgmLayers.eventGain);
+      } else {
+        connectAudioChain(gain, bgmLayers.eventGain);
+      }
+      src.start(now);
+      src.stop(now + 0.7);
+    }
+
+    function triggerFootstepCue(pan, intensity) {
+      if (!audioCtx || !bgmLayers) return;
+      const base = audioCtx.currentTime + 0.02;
+      const hits = 2;
+      for (let i = 0; i < hits; i++) {
+        const when = base + i * (0.13 + Math.random() * 0.05);
+        const src = audioCtx.createBufferSource();
+        src.buffer = bgmLayers.noiseBuffer;
+        src.playbackRate.value = 0.55 + Math.random() * 0.12;
+        const lp = audioCtx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 250 + Math.random() * 120;
+        const bp = audioCtx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 150 + Math.random() * 70;
+        bp.Q.value = 0.8;
+        const gain = audioCtx.createGain();
+        const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+        const level = (0.03 + intensity * 0.06) * (i === 0 ? 1 : 0.78);
+
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(level, when + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.17);
+
+        if (panner) {
+          panner.pan.setValueAtTime(THREE.MathUtils.clamp(pan + (Math.random() - 0.5) * 0.18, -0.95, 0.95), when);
+        }
+
+        connectAudioChain(src, lp);
+        connectAudioChain(lp, bp);
+        connectAudioChain(bp, gain);
+        if (panner) {
+          connectAudioChain(gain, panner);
+          connectAudioChain(panner, bgmLayers.eventGain);
+        } else {
+          connectAudioChain(gain, bgmLayers.eventGain);
+        }
+        src.start(when);
+        src.stop(when + 0.22);
+      }
+    }
+
+    function updateScareAudio(dt, dread, proximityFear, nearestThreat, playerPos, playerDir) {
+      if (!audioCtx || !bgmLayers || !bgmGain) return;
+      scareAudioClock += dt;
+      const now = audioCtx.currentTime;
+      const cue = nearestThreatCue(playerPos, playerDir);
+      const whisperLevel = 0.018 + dread * 0.05 + proximityFear * 0.035;
+      const droneLevel = 0.01 + dread * 0.028;
+      const airLevel = 0.004 + proximityFear * 0.025;
+      const pulse = 0.6 + Math.sin(ambienceTime * 0.33 + dread * 2.4) * 0.18;
+
+      bgmGain.gain.setTargetAtTime(0.08 + dread * 0.055, now, 0.9);
+      bgmLayers.whisperGain.gain.setTargetAtTime(whisperLevel * pulse, now, 0.7);
+      bgmLayers.droneGain.gain.setTargetAtTime(droneLevel, now, 1.1);
+      bgmLayers.airGain.gain.setTargetAtTime(airLevel, now, 0.45);
+      bgmLayers.droneFilter.frequency.setTargetAtTime(165 + dread * 90 + proximityFear * 55, now, 1.4);
+      bgmLayers.airBand.frequency.setTargetAtTime(1600 + proximityFear * 1100, now, 0.6);
+
+      if (proximityFear > 0.16 && scareAudioClock >= nextWhisperCueAt) {
+        triggerWhisperCue(cue.pan, 0.25 + proximityFear * 0.75);
+        nextWhisperCueAt = scareAudioClock + 3.2 + Math.random() * (6.8 - proximityFear * 3.4);
+      }
+      if (Number.isFinite(nearestThreat) && nearestThreat < 6.4 && scareAudioClock >= nextFootstepCueAt) {
+        triggerFootstepCue(cue.pan, 0.22 + proximityFear * 0.72);
+        nextFootstepCueAt = scareAudioClock + 1.6 + Math.random() * (3.8 - proximityFear * 1.6);
+      }
+    }
+
     function startWhisperBGM() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
@@ -3353,37 +3546,121 @@
         return;
       }
       const sr = audioCtx.sampleRate;
-      const buf = audioCtx.createBuffer(2, sr*4, sr);
-      for (let ch = 0; ch < 2; ch++) {
-        const d = buf.getChannelData(ch);
-        for (let i = 0; i < d.length; i++) {
-          const t = i/sr;
-          const syl = Math.sin(t*3.5)*0.5+0.5;
-          const br = Math.sin(t*1.2+ch)*0.3+0.7;
-          d[i] = (Math.random()*2-1)*syl*br*0.15;
-        }
-      }
-      const src = audioCtx.createBufferSource(); src.buffer = buf; src.loop = true;
-      const bp1 = audioCtx.createBiquadFilter(); bp1.type='bandpass'; bp1.frequency.value=800; bp1.Q.value=2;
-      const bp2 = audioCtx.createBiquadFilter(); bp2.type='bandpass'; bp2.frequency.value=2200; bp2.Q.value=1.5;
+      const noiseBuffer = createNoiseBuffer(audioCtx, 4);
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer;
+      src.loop = true;
+      const master = audioCtx.createGain();
+      master.gain.value = 0.0001;
+
+      const bp1 = audioCtx.createBiquadFilter();
+      bp1.type = 'bandpass';
+      bp1.frequency.value = 780;
+      bp1.Q.value = 2;
+      const bp2 = audioCtx.createBiquadFilter();
+      bp2.type = 'bandpass';
+      bp2.frequency.value = 2150;
+      bp2.Q.value = 1.5;
       const rev = audioCtx.createConvolver();
-      const rb = audioCtx.createBuffer(2, sr*2, sr);
-      for (let ch=0;ch<2;ch++) { const rd=rb.getChannelData(ch); for(let i=0;i<rd.length;i++) rd[i]=(Math.random()*2-1)*Math.exp(-i/(sr*0.5)); }
+      const rb = audioCtx.createBuffer(2, sr * 2, sr);
+      for (let ch = 0; ch < 2; ch++) {
+        const rd = rb.getChannelData(ch);
+        for (let i = 0; i < rd.length; i++) rd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.5));
+      }
       rev.buffer = rb;
-      const gain = audioCtx.createGain(); gain.gain.value = 0.0001;
-      src.connect(bp1); src.connect(bp2);
-      bp1.connect(rev); bp2.connect(rev);
-      rev.connect(gain); gain.connect(audioCtx.destination);
+      const whisperGain = audioCtx.createGain();
+      whisperGain.gain.value = 0.028;
+
+      const airHigh = audioCtx.createBiquadFilter();
+      airHigh.type = 'highpass';
+      airHigh.frequency.value = 950;
+      const airBand = audioCtx.createBiquadFilter();
+      airBand.type = 'bandpass';
+      airBand.frequency.value = 1700;
+      airBand.Q.value = 1.1;
+      const airGain = audioCtx.createGain();
+      airGain.gain.value = 0.005;
+
+      const droneMix = audioCtx.createGain();
+      const droneFilter = audioCtx.createBiquadFilter();
+      droneFilter.type = 'lowpass';
+      droneFilter.frequency.value = 180;
+      const droneGain = audioCtx.createGain();
+      droneGain.gain.value = 0.012;
+
+      const oscA = audioCtx.createOscillator();
+      oscA.type = 'sine';
+      oscA.frequency.value = 43;
+      const oscAGain = audioCtx.createGain();
+      oscAGain.gain.value = 0.45;
+
+      const oscB = audioCtx.createOscillator();
+      oscB.type = 'triangle';
+      oscB.frequency.value = 57;
+      const oscBGain = audioCtx.createGain();
+      oscBGain.gain.value = 0.22;
+
+      const oscC = audioCtx.createOscillator();
+      oscC.type = 'sawtooth';
+      oscC.frequency.value = 91;
+      const oscCGain = audioCtx.createGain();
+      oscCGain.gain.value = 0.04;
+
+      const eventGain = audioCtx.createGain();
+      eventGain.gain.value = 0.9;
+
+      connectAudioChain(src, bp1);
+      connectAudioChain(src, bp2);
+      connectAudioChain(bp1, rev);
+      connectAudioChain(bp2, rev);
+      connectAudioChain(rev, whisperGain);
+      connectAudioChain(whisperGain, master);
+
+      connectAudioChain(src, airHigh);
+      connectAudioChain(airHigh, airBand);
+      connectAudioChain(airBand, airGain);
+      connectAudioChain(airGain, master);
+
+      connectAudioChain(oscA, oscAGain);
+      connectAudioChain(oscB, oscBGain);
+      connectAudioChain(oscC, oscCGain);
+      connectAudioChain(oscAGain, droneMix);
+      connectAudioChain(oscBGain, droneMix);
+      connectAudioChain(oscCGain, droneMix);
+      connectAudioChain(droneMix, droneFilter);
+      connectAudioChain(droneFilter, droneGain);
+      connectAudioChain(droneGain, master);
+
+      connectAudioChain(eventGain, master);
+      connectAudioChain(master, audioCtx.destination);
+
       src.start();
+      oscA.start();
+      oscB.start();
+      oscC.start();
       bgmSource = src;
-      bgmGain = gain;
+      bgmGain = master;
+      bgmLayers = {
+        noiseBuffer,
+        whisperGain,
+        airGain,
+        airBand,
+        droneGain,
+        droneFilter,
+        eventGain,
+        droneOscillators: [oscA, oscB, oscC]
+      };
+      scareAudioClock = 0;
+      nextWhisperCueAt = 2.5 + Math.random() * 2;
+      nextFootstepCueAt = 1.2 + Math.random() * 1.5;
       src.onended = () => {
         if (bgmSource === src) {
           bgmSource = null;
           bgmGain = null;
+          bgmLayers = null;
         }
       };
-      gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 1.2);
+      master.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 1.2);
     }
 
     function stopWhisperBGM(fadeOut = 1.4) {
@@ -3392,15 +3669,25 @@
       const now = audioCtx.currentTime;
       const source = bgmSource;
       const gain = bgmGain;
+      const layers = bgmLayers;
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOut);
       bgmStopHandle = window.setTimeout(() => {
         try { source.stop(); } catch (e) {}
+        if (layers && Array.isArray(layers.droneOscillators)) {
+          layers.droneOscillators.forEach(osc => {
+            try { osc.stop(); } catch (e) {}
+          });
+        }
         if (bgmSource === source) {
           bgmSource = null;
           bgmGain = null;
+          bgmLayers = null;
         }
+        scareAudioClock = 0;
+        nextWhisperCueAt = 0;
+        nextFootstepCueAt = 0;
         bgmStopHandle = 0;
       }, Math.ceil(fadeOut * 1000) + 120);
     }
@@ -3880,6 +4167,7 @@
         // Minimap fades with battery
         mmCanvas.style.opacity = (0.3 + batteryLife * 0.7).toFixed(2);
         const pDir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+        updateScareAudio(dt, dread, proximityFear, nearestThreat, camera.position, pDir);
         shadows.forEach(s => s.update(dt, camera.position, pDir));
         figures.forEach(f => f.update(dt, camera.position, pDir));
         bosses.forEach(b => b.update(dt));
