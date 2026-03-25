@@ -283,7 +283,7 @@
   </div>
   <div id="purified-hud">
     <span class="label">PURGED</span>
-    <span id="purified-count">0/18</span>
+    <span id="purified-count">0/--</span>
   </div>
   <div id="crosshair"></div>
   <div id="flash-overlay"></div>
@@ -299,7 +299,8 @@
     import * as THREE from 'three';
 
     // ===== Game State =====
-    const TARGET_GHOST_COUNT = 18;
+    const MIN_GHOST_COUNT = 10;
+    const MAX_GHOST_COUNT = 18;
     const BASE_WALL_GHOST_COUNT = 6;
     let gameStarted = false, isPointerLocked = false, isMoving = false;
     let flashCharge = 1.0, shadows = [], score = 0, startTime = 0;
@@ -2104,11 +2105,13 @@
     }
 
     function spawnEncounter() {
-      const bossCount = Math.random() < 0.38 ? 2 : 1;
-      spawnShadows(BASE_WALL_GHOST_COUNT);
+      const encounterGhostCount = MIN_GHOST_COUNT + Math.floor(Math.random() * (MAX_GHOST_COUNT - MIN_GHOST_COUNT + 1));
+      const bossCount = encounterGhostCount >= 15 && Math.random() < 0.38 ? 2 : 1;
+      const wallGhostCount = Math.min(BASE_WALL_GHOST_COUNT, Math.max(3, Math.floor(encounterGhostCount * 0.4)));
+      spawnShadows(wallGhostCount);
       const spawnedBosses = spawnBosses(bossCount);
-      spawnFigures(TARGET_GHOST_COUNT - BASE_WALL_GHOST_COUNT - spawnedBosses);
-      const remainder = TARGET_GHOST_COUNT - countAliveEnemies();
+      spawnFigures(encounterGhostCount - wallGhostCount - spawnedBosses);
+      const remainder = encounterGhostCount - countAliveEnemies();
       if (remainder > 0) spawnShadows(remainder);
       totalGhosts = countAliveEnemies();
     }
@@ -2230,9 +2233,12 @@
     function updateHUD() {
       const alive = countAliveEnemies();
       shadowCountEl.textContent = `REMAINING: ${alive}`;
-      const displayTotal = totalGhosts || TARGET_GHOST_COUNT;
-      const purified = gameStarted ? Math.max(0, displayTotal - alive) : 0;
-      purifiedCountEl.textContent = `${purified}/${displayTotal}`;
+      if (gameStarted && totalGhosts > 0) {
+        const purified = Math.max(0, totalGhosts - alive);
+        purifiedCountEl.textContent = `${purified}/${totalGhosts}`;
+      } else {
+        purifiedCountEl.textContent = '0/--';
+      }
       const bars = Math.round(flashCharge*12);
       flashChargeEl.textContent = `FLASH: ${'█'.repeat(bars)}${'░'.repeat(12-bars)}`;
     }
