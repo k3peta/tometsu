@@ -339,7 +339,7 @@
   <div id="flash-overlay"></div>
   <div id="dread-overlay"></div>
   <div id="stairs-prompt"></div>
-  <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ ｜ E: 階段 ｜ Esc: 中断</div>
+  <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ ｜ Esc: 中断</div>
   <canvas id="minimap" width="210" height="170"></canvas>
   <div id="ghost-announce"><p id="ghost-announce-text"></p></div>
 
@@ -2443,7 +2443,7 @@
         stairsPromptEl.textContent = '';
         return;
       }
-      stairsPromptEl.textContent = `E: 階段で ${floors[getLinkedFloorIndex()].label} へ`;
+      stairsPromptEl.textContent = `このまま進むと ${floors[getLinkedFloorIndex()].label} へ`;
       stairsPromptEl.style.opacity = '1';
     }
 
@@ -2497,6 +2497,7 @@
       const arrival = currentStairWorld();
       const facing = currentFloor.stairFacing;
       stairUseCooldown = 0.45;
+      isMoving = false;
       camera.position.set(
         arrival.x + facing.dc * 0.55,
         1.6,
@@ -2634,10 +2635,6 @@
         }
         return;
       }
-      if ((e.key === 'e' || e.key === 'E') && gameStarted && !floorCleared && !pauseOpen && stairUseCooldown <= 0 && isNearCurrentStairs()) {
-        e.preventDefault();
-        switchFloor(getLinkedFloorIndex());
-      }
     });
 
     function updateHUD() {
@@ -2704,6 +2701,7 @@
           if (canMove(nx, nz)) { camera.position.x = nx; camera.position.z = nz; }
           else if (canMove(nx, camera.position.z)) camera.position.x = nx;
           else if (canMove(camera.position.x, nz)) camera.position.z = nz;
+          if (stairUseCooldown <= 0 && isNearCurrentStairs()) switchFloor(getLinkedFloorIndex());
         }
         flashCharge = Math.min(1, flashCharge + dt * 0.25);
         // Battery drain: decays from 1.0 → 0.3 over ~120 seconds
