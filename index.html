@@ -963,7 +963,21 @@
     }
 
     // ===== Lights =====
-    const flashlight = new THREE.SpotLight(0xfff8dd, 12, 40, Math.PI/3.5, 0.5, 0.8);
+    const FLASHLIGHT_BASE_INTENSITY = 12;
+    const FLASHLIGHT_FLASH_INTENSITY = 40;
+    const FLASHLIGHT_BASE_DISTANCE = 40;
+    const FLASHLIGHT_MIN_DISTANCE = 14;
+    const FLASHLIGHT_BASE_ANGLE = Math.PI / 3.5;
+    const FLASHLIGHT_MIN_ANGLE = Math.PI / 6.2;
+    const FLASHLIGHT_BASE_PENUMBRA = 0.52;
+    const flashlight = new THREE.SpotLight(
+      0xfff8dd,
+      FLASHLIGHT_BASE_INTENSITY,
+      FLASHLIGHT_BASE_DISTANCE,
+      FLASHLIGHT_BASE_ANGLE,
+      FLASHLIGHT_BASE_PENUMBRA,
+      0.8
+    );
     flashlight.castShadow = true;
     camera.add(flashlight);
     camera.add(flashlight.target);
@@ -989,8 +1003,8 @@
         const hemY = 482 + Math.random() * 10;
 
         const aura = ctx.createRadialGradient(cx, 220, 30, cx, 220, 200);
-        aura.addColorStop(0, 'rgba(72,84,112,0.20)');
-        aura.addColorStop(0.45, 'rgba(18,24,34,0.14)');
+        aura.addColorStop(0, 'rgba(222,232,252,0.26)');
+        aura.addColorStop(0.45, 'rgba(184,198,228,0.15)');
         aura.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = aura;
         ctx.beginPath();
@@ -998,10 +1012,10 @@
         ctx.fill();
 
         const form = ctx.createLinearGradient(0, 40, 0, hemY);
-        form.addColorStop(0, 'rgba(56,62,80,0)');
-        form.addColorStop(0.12, 'rgba(44,48,62,0.92)');
-        form.addColorStop(0.48, 'rgba(8,10,16,0.97)');
-        form.addColorStop(0.85, 'rgba(3,4,8,0.88)');
+        form.addColorStop(0, 'rgba(236,244,255,0)');
+        form.addColorStop(0.12, 'rgba(236,242,255,0.88)');
+        form.addColorStop(0.48, 'rgba(196,208,230,0.74)');
+        form.addColorStop(0.85, 'rgba(146,156,180,0.30)');
         form.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = form;
         ctx.beginPath();
@@ -1016,9 +1030,9 @@
         ctx.fill();
 
         const skull = ctx.createRadialGradient(cx + skullShift, 118, 10, cx + skullShift, 128, 72);
-        skull.addColorStop(0, 'rgba(190,202,232,0.18)');
-        skull.addColorStop(0.22, 'rgba(128,138,166,0.12)');
-        skull.addColorStop(0.68, 'rgba(14,16,24,0.76)');
+        skull.addColorStop(0, 'rgba(255,255,255,0.48)');
+        skull.addColorStop(0.22, 'rgba(232,238,250,0.22)');
+        skull.addColorStop(0.68, 'rgba(108,120,148,0.16)');
         skull.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = skull;
         ctx.beginPath();
@@ -1026,8 +1040,8 @@
         ctx.fill();
 
         const veil = ctx.createLinearGradient(cx, 62, cx, 220);
-        veil.addColorStop(0, 'rgba(100,112,146,0.14)');
-        veil.addColorStop(0.4, 'rgba(36,38,48,0.11)');
+        veil.addColorStop(0, 'rgba(246,248,255,0.22)');
+        veil.addColorStop(0.4, 'rgba(206,214,232,0.12)');
         veil.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = veil;
         ctx.beginPath();
@@ -1041,7 +1055,7 @@
         const eyeY = 132;
         for (const ex of [cx + skullShift - 24, cx + skullShift + 24]) {
           if (closedEyes) {
-            ctx.strokeStyle = 'rgba(162,172,198,0.18)';
+            ctx.strokeStyle = 'rgba(120,132,166,0.26)';
             ctx.lineWidth = 2.4;
             ctx.beginPath();
             ctx.moveTo(ex - 16, eyeY);
@@ -1049,22 +1063,22 @@
             ctx.stroke();
           } else {
             const socket = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, 20);
-            socket.addColorStop(0, 'rgba(208,220,244,0.20)');
-            socket.addColorStop(0.4, 'rgba(96,102,128,0.08)');
+            socket.addColorStop(0, 'rgba(250,252,255,0.34)');
+            socket.addColorStop(0.4, 'rgba(220,228,244,0.14)');
             socket.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = socket;
             ctx.beginPath();
             ctx.ellipse(ex, eyeY, 16, 22, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = 'rgba(10,10,14,0.75)';
+            ctx.fillStyle = 'rgba(28,32,42,0.34)';
             ctx.beginPath();
             ctx.ellipse(ex, eyeY + 2, 7, 11, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
 
-        ctx.fillStyle = 'rgba(150,160,184,0.07)';
+        ctx.fillStyle = 'rgba(196,206,230,0.12)';
         ctx.beginPath();
         ctx.moveTo(cx + skullShift, 148);
         ctx.lineTo(cx + skullShift - 9, 178);
@@ -1074,7 +1088,7 @@
 
         const mouthY = 206 + Math.random() * 10;
         if (closedEyes) {
-          ctx.strokeStyle = 'rgba(132,140,160,0.10)';
+          ctx.strokeStyle = 'rgba(150,160,184,0.16)';
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(cx + skullShift - 16, mouthY);
@@ -1082,7 +1096,7 @@
           ctx.stroke();
         } else {
           const maw = ctx.createRadialGradient(cx + skullShift, mouthY, 0, cx + skullShift, mouthY, 26);
-          maw.addColorStop(0, 'rgba(168,176,198,0.14)');
+          maw.addColorStop(0, 'rgba(240,244,255,0.22)');
           maw.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = maw;
           ctx.beginPath();
@@ -1090,7 +1104,7 @@
           ctx.fill();
         }
 
-        ctx.strokeStyle = 'rgba(166,176,198,0.05)';
+        ctx.strokeStyle = 'rgba(226,234,248,0.09)';
         for (let i = 0; i < 8; i++) {
           const sx = cx + (Math.random() - 0.5) * 82;
           const sy = 188 + Math.random() * 180;
@@ -1126,7 +1140,7 @@
           const wx = cx + (Math.random() - 0.5) * 160;
           const wy = 160 + Math.random() * 260;
           const glow = ctx.createRadialGradient(wx, wy, 0, wx, wy, 18 + Math.random() * 22);
-          glow.addColorStop(0, `rgba(32,36,48,${0.08 + Math.random() * 0.06})`);
+          glow.addColorStop(0, `rgba(214,224,246,${0.10 + Math.random() * 0.08})`);
           glow.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
@@ -1159,7 +1173,7 @@
         else { sizeW = 3.5 + Math.random()*1.0; sizeH = 1.8 + Math.random()*0.6; } // enormous
         this.size = Math.max(sizeW, sizeH);
 
-        this.baseOpacity = 0.82 + Math.random() * 0.08;
+        this.baseOpacity = 0.72 + Math.random() * 0.10;
         this.frontOffset = normal.clone().multiplyScalar(0.02);
 
         // Two textures for blink animation
@@ -1168,7 +1182,7 @@
 
         const mat = new THREE.MeshBasicMaterial({
           map: this.texOpen,
-          color: 0xffffff,
+          color: 0xf6f9ff,
           transparent: true,
           opacity: this.baseOpacity,
           side: THREE.DoubleSide,
@@ -1184,12 +1198,13 @@
           new THREE.PlaneGeometry(sizeW * 2.35, sizeH * 2.25),
           new THREE.MeshBasicMaterial({
             map: this.texOpen,
-            color: 0x7a89a8,
+            color: 0xdfeaff,
             transparent: true,
-            opacity: 0.12,
+            opacity: 0.22,
             side: THREE.DoubleSide,
             depthWrite: false,
-            alphaTest: 0.01
+            alphaTest: 0.01,
+            blending: THREE.AdditiveBlending
           })
         );
         this.shell.position.copy(this.mesh.position).add(normal.clone().multiplyScalar(0.012));
@@ -1279,17 +1294,17 @@
         const attention = Math.max(0, toPlayer.dot(this.normal)) * Math.max(0, 1 - dist / 9);
 
         this.shell.position.copy(this.mesh.position).add(this.normal.clone().multiplyScalar(0.012));
-        this.shell.material.opacity = 0.08 + attention * 0.12 + Math.sin(this.pulsePhase * 1.5) * 0.015;
+        this.shell.material.opacity = 0.16 + attention * 0.18 + Math.sin(this.pulsePhase * 1.5) * 0.025;
 
         if (this.hitTimer > 0) {
           this.hitTimer -= dt;
-          this.mesh.material.color.setHex(0xffb2b2);
-          this.shell.material.color.setHex(0xa56c78);
-          this.mesh.material.opacity = 0.6;
+          this.mesh.material.color.setHex(0xffd8d8);
+          this.shell.material.color.setHex(0xffb0b0);
+          this.mesh.material.opacity = 0.52;
         } else {
-          this.mesh.material.color.setHex(0xffffff);
-          this.shell.material.color.setHex(0x7a89a8);
-          this.mesh.material.opacity = this.baseOpacity + attention * 0.05;
+          this.mesh.material.color.setHex(0xf6f9ff);
+          this.shell.material.color.setHex(0xdfeaff);
+          this.mesh.material.opacity = this.baseOpacity + attention * 0.08;
         }
       }
 
@@ -1320,7 +1335,14 @@
         this.alive = false;
         for (let i = 0; i < 6; i++) {
           const p = new THREE.Mesh(new THREE.CircleGeometry(this.size*0.2, 6),
-            new THREE.MeshBasicMaterial({color:0x111111,transparent:true,opacity:0.6,side:THREE.DoubleSide}));
+            new THREE.MeshBasicMaterial({
+              color: 0xe8f2ff,
+              transparent: true,
+              opacity: 0.42,
+              side: THREE.DoubleSide,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false
+            }));
           p.position.copy(this.mesh.position); p.quaternion.copy(this.mesh.quaternion);
           scene.add(p);
           const v = new THREE.Vector3((Math.random()-0.5)*2,(Math.random()-0.5)*2,(Math.random()-0.5)*2);
@@ -1344,8 +1366,8 @@
         const cy = h / 2;
 
         const aura = ctx.createRadialGradient(cx, cy, 20, cx, cy, 110);
-        aura.addColorStop(0, 'rgba(70,80,104,0.16)');
-        aura.addColorStop(0.55, 'rgba(18,20,30,0.10)');
+        aura.addColorStop(0, 'rgba(226,236,255,0.24)');
+        aura.addColorStop(0.55, 'rgba(188,198,230,0.11)');
         aura.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = aura;
         ctx.beginPath();
@@ -1354,9 +1376,9 @@
 
         if (type === 'snake') {
           const body = ctx.createLinearGradient(0, 16, 0, h - 16);
-          body.addColorStop(0, 'rgba(46,52,74,0)');
-          body.addColorStop(0.16, 'rgba(16,18,28,0.94)');
-          body.addColorStop(0.85, 'rgba(8,10,18,0.92)');
+          body.addColorStop(0, 'rgba(244,248,255,0)');
+          body.addColorStop(0.16, 'rgba(242,246,255,0.86)');
+          body.addColorStop(0.85, 'rgba(176,188,220,0.56)');
           body.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = body;
           ctx.beginPath();
@@ -1371,7 +1393,7 @@
           ctx.closePath();
           ctx.fill();
 
-          ctx.strokeStyle = 'rgba(168,178,205,0.08)';
+          ctx.strokeStyle = 'rgba(142,156,192,0.16)';
           for (let i = 0; i < 8; i++) {
             const y = 48 + i * 22;
             ctx.beginPath();
@@ -1382,14 +1404,14 @@
           if (role === 'head') {
             for (const ex of [cx - 24, cx + 24]) {
               const eye = ctx.createRadialGradient(ex, 98, 0, ex, 98, 14);
-              eye.addColorStop(0, 'rgba(210,220,255,0.22)');
+              eye.addColorStop(0, 'rgba(255,255,255,0.28)');
               eye.addColorStop(1, 'rgba(0,0,0,0)');
               ctx.fillStyle = eye;
               ctx.beginPath();
               ctx.ellipse(ex, 98, 8, 20, 0, 0, Math.PI * 2);
               ctx.fill();
             }
-            ctx.fillStyle = 'rgba(140,150,188,0.12)';
+            ctx.fillStyle = 'rgba(170,184,214,0.18)';
             ctx.beginPath();
             ctx.moveTo(cx, 180);
             ctx.lineTo(cx - 8, 214);
@@ -1399,8 +1421,8 @@
           }
         } else if (type === 'lizard') {
           const body = ctx.createRadialGradient(cx, cy, 22, cx, cy, 110);
-          body.addColorStop(0, 'rgba(28,34,24,0.96)');
-          body.addColorStop(0.45, 'rgba(12,16,12,0.95)');
+          body.addColorStop(0, 'rgba(236,246,238,0.86)');
+          body.addColorStop(0.45, 'rgba(198,220,202,0.62)');
           body.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = body;
           ctx.beginPath();
@@ -1416,7 +1438,7 @@
           ctx.closePath();
           ctx.fill();
 
-          ctx.strokeStyle = 'rgba(148,166,132,0.07)';
+          ctx.strokeStyle = 'rgba(146,170,146,0.14)';
           for (let i = 0; i < 11; i++) {
             const px = 40 + Math.random() * (w - 80);
             const py = 42 + Math.random() * (h - 84);
@@ -1427,7 +1449,7 @@
           if (role === 'head') {
             for (const ex of [cx - 30, cx + 30]) {
               const eye = ctx.createRadialGradient(ex, 104, 0, ex, 104, 14);
-              eye.addColorStop(0, 'rgba(214,222,202,0.20)');
+              eye.addColorStop(0, 'rgba(250,255,244,0.24)');
               eye.addColorStop(1, 'rgba(0,0,0,0)');
               ctx.fillStyle = eye;
               ctx.beginPath();
@@ -1437,8 +1459,8 @@
           }
         } else {
           const body = ctx.createRadialGradient(cx, cy, 20, cx, cy, 112);
-          body.addColorStop(0, 'rgba(38,34,48,0.92)');
-          body.addColorStop(0.38, 'rgba(12,10,18,0.95)');
+          body.addColorStop(0, 'rgba(246,240,255,0.84)');
+          body.addColorStop(0.38, 'rgba(216,202,236,0.58)');
           body.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = body;
           ctx.beginPath();
@@ -1456,7 +1478,7 @@
           ctx.fill();
 
           if (role === 'head') {
-            ctx.fillStyle = 'rgba(18,18,22,0.84)';
+            ctx.fillStyle = 'rgba(118,110,144,0.20)';
             ctx.beginPath();
             ctx.moveTo(cx - 18, 120);
             ctx.lineTo(cx, 182);
@@ -1465,7 +1487,7 @@
             ctx.fill();
             for (const ex of [cx - 22, cx + 22]) {
               const eye = ctx.createRadialGradient(ex, 98, 0, ex, 98, 12);
-              eye.addColorStop(0, 'rgba(212,220,248,0.18)');
+              eye.addColorStop(0, 'rgba(255,248,255,0.26)');
               eye.addColorStop(1, 'rgba(0,0,0,0)');
               ctx.fillStyle = eye;
               ctx.beginPath();
@@ -1474,7 +1496,7 @@
             }
           }
 
-          ctx.strokeStyle = 'rgba(190,196,220,0.06)';
+          ctx.strokeStyle = 'rgba(188,190,224,0.13)';
           for (let i = 0; i < 9; i++) {
             const startX = 62 + Math.random() * 132;
             const startY = 56 + Math.random() * 118;
@@ -1504,8 +1526,8 @@
         ctx.clearRect(0, 0, w, h);
         if (kind === 'wing') {
           const wing = ctx.createLinearGradient(0, 0, w, h);
-          wing.addColorStop(0, 'rgba(42,44,66,0.6)');
-          wing.addColorStop(0.5, 'rgba(14,14,22,0.82)');
+          wing.addColorStop(0, 'rgba(238,242,255,0.62)');
+          wing.addColorStop(0.5, 'rgba(188,194,220,0.38)');
           wing.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = wing;
           ctx.beginPath();
@@ -1514,7 +1536,7 @@
           ctx.quadraticCurveTo(126, 96, 44, 170);
           ctx.closePath();
           ctx.fill();
-          ctx.strokeStyle = 'rgba(186,194,220,0.07)';
+          ctx.strokeStyle = 'rgba(210,220,244,0.14)';
           for (let i = 0; i < 6; i++) {
             ctx.beginPath();
             ctx.moveTo(44, 98 + i * 8);
@@ -1522,7 +1544,7 @@
             ctx.stroke();
           }
         } else {
-          ctx.fillStyle = 'rgba(12,14,12,0.86)';
+          ctx.fillStyle = 'rgba(222,232,228,0.68)';
           ctx.beginPath();
           ctx.moveTo(96, 18);
           ctx.quadraticCurveTo(122, 92, 116, 152);
@@ -1544,9 +1566,9 @@
 
     let bosses = [];
     const BOSS_TYPES = {
-      snake: { segments:14, headSize:0.45, taper:0.85, speed:1.2, hp:4, color:0x0a0a18 },
-      lizard:{ segments:10, headSize:0.5, taper:0.8, speed:0.8, hp:5, color:0x0a1008, legs:true },
-      bird:  { segments:8, headSize:0.4, taper:0.9, speed:1.8, hp:3, color:0x0a0818, wings:true },
+      snake: { segments:14, headSize:0.45, taper:0.85, speed:1.2, hp:4, color:0xe5eeff },
+      lizard:{ segments:10, headSize:0.5, taper:0.8, speed:0.8, hp:5, color:0xe6f4ea, legs:true },
+      bird:  { segments:8, headSize:0.4, taper:0.9, speed:1.8, hp:3, color:0xf0e8ff, wings:true },
     };
     class ShadowBoss {
       constructor(wf, type) {
@@ -1577,10 +1599,11 @@
             map: i === 0 ? headTex : bodyTex,
             color: c.color,
             transparent: true,
-            opacity: 0.74 - t * 0.32,
+            opacity: 0.62 - t * 0.18,
             side: THREE.DoubleSide,
             depthWrite: false,
-            alphaTest: 0.02
+            alphaTest: 0.02,
+            blending: THREE.AdditiveBlending
           });
           const geo = i === 0 ? new THREE.PlaneGeometry(sz*2.35,sz*2.15) : new THREE.PlaneGeometry(sz*2.1,sz*2.1);
           const seg=new THREE.Mesh(geo,sm);
@@ -1590,7 +1613,14 @@
           this.tintMaterials.push(sm);
         }
         // Head eyes
-        const eyeM=new THREE.MeshBasicMaterial({color:0xc2d4ff,transparent:true,opacity:0.22,side:THREE.DoubleSide,depthWrite:false});
+        const eyeM=new THREE.MeshBasicMaterial({
+          color:0xf7fbff,
+          transparent:true,
+          opacity:0.28,
+          side:THREE.DoubleSide,
+          depthWrite:false,
+          blending: THREE.AdditiveBlending
+        });
         for (const s of [-1,1]) {
           const eye=new THREE.Mesh(new THREE.CircleGeometry(c.headSize*0.2,6),eyeM);
           eye.position.set(s*c.headSize*0.5,c.headSize*0.3,0.01);
@@ -1603,10 +1633,11 @@
             map: appendageTex,
             color: c.color,
             transparent: true,
-            opacity: 0.45,
+            opacity: 0.34,
             side: THREE.DoubleSide,
             depthWrite: false,
-            alphaTest: 0.02
+            alphaTest: 0.02,
+            blending: THREE.AdditiveBlending
           });
           this.tintMaterials.push(lm);
           for(const s of[-1,1]){const lg=new THREE.Mesh(new THREE.PlaneGeometry(0.24,0.55),lm);
@@ -1618,10 +1649,11 @@
             map: appendageTex,
             color: c.color,
             transparent: true,
-            opacity: 0.42,
+            opacity: 0.32,
             side: THREE.DoubleSide,
             depthWrite: false,
-            alphaTest: 0.02
+            alphaTest: 0.02,
+            blending: THREE.AdditiveBlending
           });
           this.tintMaterials.push(wm);
           for(const s of[-1,1]){const w=new THREE.Mesh(new THREE.PlaneGeometry(0.95,0.72),wm);
@@ -1663,7 +1695,7 @@
           this.eyeMaterials.forEach(m=>{m.color.setHex(0xffc8c8); m.opacity = 0.3;});
         } else {
           this.tintMaterials.forEach(m=>{m.color.setHex(this.cfg.color);});
-          this.eyeMaterials.forEach(m=>{m.color.setHex(0xc2d4ff); m.opacity = 0.18 + Math.sin(this.time*4) * 0.04;});
+          this.eyeMaterials.forEach(m=>{m.color.setHex(0xf7fbff); m.opacity = 0.22 + Math.sin(this.time*4) * 0.05;});
         }
         this.segments.forEach((s,i)=>{s.scale.setScalar(1+Math.sin(this.time*3+i*0.4)*0.05);});
       }
@@ -1902,9 +1934,10 @@
       scene.fog.density = BASE_FOG_DENSITY;
       ambientLight.intensity = BASE_AMBIENT_INTENSITY;
       moon.intensity = BASE_MOON_INTENSITY;
-      flashlight.intensity = 12;
-      flashlight.angle = Math.PI / 3.5;
-      flashlight.penumbra = 0.5;
+      flashlight.intensity = FLASHLIGHT_BASE_INTENSITY;
+      flashlight.distance = FLASHLIGHT_BASE_DISTANCE;
+      flashlight.angle = FLASHLIGHT_BASE_ANGLE;
+      flashlight.penumbra = FLASHLIGHT_BASE_PENUMBRA;
       mmCanvas.style.opacity = '1';
       instructionsEl.style.opacity = '1';
       updateHUD();
@@ -1948,8 +1981,11 @@
       scene.fog.density = BASE_FOG_DENSITY;
       ambientLight.intensity = BASE_AMBIENT_INTENSITY;
       moon.intensity = BASE_MOON_INTENSITY;
-      flashlight.angle = Math.PI / 3.5;
-      flashlight.penumbra = 0.5;
+      flashlight.intensity = FLASHLIGHT_BASE_INTENSITY;
+      flashlight.distance = FLASHLIGHT_BASE_DISTANCE;
+      flashlight.angle = FLASHLIGHT_BASE_ANGLE;
+      flashlight.penumbra = FLASHLIGHT_BASE_PENUMBRA;
+      mmCanvas.style.opacity = '1';
       instructionsEl.style.opacity = '1';
       spawnShadows(6);
       spawnFigures();
@@ -2048,22 +2084,27 @@
         const proximityFear = Number.isFinite(nearestThreat) ? Math.max(0, 1 - nearestThreat / 9.5) : 0;
         const batteryFear = Math.max(0, (1 - batteryLife) / 0.7);
         const dread = Math.min(1, proximityFear * 0.78 + batteryFear * 0.55);
+        const reachFade = Math.pow(batteryFear, 1.15);
         const flickerStrength = batteryLife < 0.55 ? Math.min(1, (0.55 - batteryLife) / 0.25) : 0;
         const flicker = 1 - flickerStrength * (0.08 + 0.08 * Math.max(0, Math.sin(ambienceTime * 34 + dread * 6)));
+        const beamDistance = THREE.MathUtils.lerp(FLASHLIGHT_BASE_DISTANCE, FLASHLIGHT_MIN_DISTANCE, reachFade) * (1 - dread * 0.04);
+        const beamAngle = THREE.MathUtils.lerp(FLASHLIGHT_BASE_ANGLE, FLASHLIGHT_MIN_ANGLE, reachFade);
 
         ambientLight.intensity = BASE_AMBIENT_INTENSITY - dread * 0.55;
         moon.intensity = BASE_MOON_INTENSITY - dread * 0.12;
         scene.fog.density = BASE_FOG_DENSITY + dread * 0.016 + Math.sin(ambienceTime * 1.1) * 0.0015 * proximityFear;
         dreadOverlay.style.opacity = (0.1 + dread * 0.26 + Math.max(0, Math.sin(ambienceTime * 2.4)) * 0.03 * proximityFear).toFixed(2);
-        flashlight.angle = Math.PI / (3.5 + dread * 0.45);
-        flashlight.penumbra = 0.5 + dread * 0.18;
+        flashlight.distance = beamDistance;
+        flashlight.angle = Math.max(FLASHLIGHT_MIN_ANGLE * 0.94, beamAngle - dread * 0.055);
+        flashlight.penumbra = THREE.MathUtils.clamp(FLASHLIGHT_BASE_PENUMBRA - reachFade * 0.18 + dread * 0.12, 0.26, 0.72);
 
         if (flashTimer > 0) {
           flashTimer = Math.max(0, flashTimer - dt);
-          flashlight.intensity = 40 * batteryLife * (1 - dread * 0.1) * flicker;
+          flashlight.intensity = FLASHLIGHT_FLASH_INTENSITY * batteryLife * (1 - dread * 0.1) * flicker;
+          flashlight.distance = beamDistance * 1.08;
           flashOverlay.style.background = 'rgba(255,255,220,0.5)';
         } else {
-          flashlight.intensity = 12 * batteryLife * (1 - dread * 0.1) * flicker;
+          flashlight.intensity = FLASHLIGHT_BASE_INTENSITY * batteryLife * (1 - dread * 0.1) * flicker;
           flashOverlay.style.background = 'rgba(255,255,220,0)';
         }
         // Minimap fades with battery
