@@ -153,6 +153,62 @@
     }
     #clear-screen h2 { font-family: 'Courier New', monospace; font-size: 36px; color: #8f8; margin-bottom: 16px; }
     #clear-screen p { color: #888; font-family: 'Courier New', monospace; }
+    #pause-screen {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.88);
+      display: none; align-items: center; justify-content: center;
+      z-index: 105;
+    }
+    .pause-panel {
+      min-width: min(92vw, 360px);
+      padding: 28px 26px 24px;
+      border: 1px solid rgba(152,144,122,0.2);
+      background: linear-gradient(180deg, rgba(14,16,19,0.95), rgba(8,9,10,0.92));
+      box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+      text-align: center;
+    }
+    .pause-panel h2 {
+      margin: 0 0 12px;
+      color: #d8d2c0;
+      font-family: 'BIZ UDPMincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+      font-size: 34px;
+      letter-spacing: 0.18em;
+      padding-left: 0.18em;
+    }
+    .pause-panel p {
+      margin: 8px 0 0;
+      color: #8f8878;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .pause-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .pause-actions button {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid rgba(164,154,130,0.22);
+      background: rgba(28,30,34,0.92);
+      color: #d9d3c4;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .pause-actions button:hover {
+      background: rgba(44,48,54,0.98);
+      border-color: rgba(202,190,154,0.34);
+      color: #f2ecde;
+    }
+    .pause-actions button:last-child {
+      color: #c6a6a0;
+      border-color: rgba(168,114,104,0.24);
+    }
     #minimap {
       position: fixed; bottom: 16px; right: 16px;
       pointer-events: none; z-index: 10;
@@ -193,6 +249,17 @@
     <p id="clear-stats"></p>
     <p style="margin-top:20px;animation:pulse 2s infinite">— クリックで再挑戦 —</p>
   </div>
+  <div id="pause-screen">
+    <div class="pause-panel">
+      <h2>中断中</h2>
+      <p>「ゲームへ戻る」で再開できます</p>
+      <p>Esc をもう一度押すとタイトルへ戻ります</p>
+      <div class="pause-actions">
+        <button id="pause-resume" type="button">ゲームへ戻る</button>
+        <button id="pause-quit" type="button">タイトルへ戻る</button>
+      </div>
+    </div>
+  </div>
   <div id="hud">
     <span id="shadow-count">SHADOWS: 0</span>
     <span id="flash-charge">FLASH: ████████████</span>
@@ -200,7 +267,7 @@
   <div id="crosshair"></div>
   <div id="flash-overlay"></div>
   <div id="dread-overlay"></div>
-  <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ</div>
+  <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ ｜ Esc: 中断</div>
   <canvas id="minimap" width="210" height="170"></canvas>
   <div id="ghost-announce"><p id="ghost-announce-text"></p></div>
 
@@ -215,7 +282,7 @@
     let flashCharge = 1.0, shadows = [], score = 0, startTime = 0;
     let batteryLife = 1.0; // 1.0 = full, decays to 0.3 over time
     let flashTimer = 0, floorCleared = false, totalGhosts = 0, ghostAnnounceTimer = 0;
-    let ambienceTime = 0;
+    let ambienceTime = 0, pauseOpen = false, suppressPauseOnUnlock = false;
 
     // ===== Procedural Floor Generation (BSP) =====
     const T = 2, CH = 3.5;
@@ -1716,7 +1783,10 @@
     // ===== Controls =====
     const titleScreen = document.getElementById('title-screen');
     const clearScreen = document.getElementById('clear-screen');
+    const pauseScreen = document.getElementById('pause-screen');
     const clearStats = document.getElementById('clear-stats');
+    const pauseResumeBtn = document.getElementById('pause-resume');
+    const pauseQuitBtn = document.getElementById('pause-quit');
     const shadowCountEl = document.getElementById('shadow-count');
     const flashChargeEl = document.getElementById('flash-charge');
     const flashOverlay = document.getElementById('flash-overlay');
@@ -1778,7 +1848,24 @@
 
     // Pointer Lock
     renderer.domElement.addEventListener('click', () => { if (gameStarted && !floorCleared) renderer.domElement.requestPointerLock(); });
-    document.addEventListener('pointerlockchange', () => { isPointerLocked = document.pointerLockElement === renderer.domElement; });
+    document.addEventListener('pointerlockchange', () => {
+      isPointerLocked = document.pointerLockElement === renderer.domElement;
+      if (isPointerLocked) {
+        pauseOpen = false;
+        pauseScreen.style.display = 'none';
+        return;
+      }
+      if (suppressPauseOnUnlock) {
+        suppressPauseOnUnlock = false;
+        return;
+      }
+      if (gameStarted && !floorCleared) {
+        pauseOpen = true;
+        isMoving = false;
+        pauseScreen.style.display = 'flex';
+        instructionsEl.style.opacity = '1';
+      }
+    });
 
     // ===== Game Flow =====
     function showGhostAnnouncement() {
@@ -1790,21 +1877,71 @@
       }, 4200);
     }
 
+    function returnToTitle() {
+      clearTimeout(ghostAnnounceTimer);
+      clearActiveEnemies();
+      gameStarted = false;
+      floorCleared = false;
+      pauseOpen = false;
+      score = 0;
+      flashCharge = 1;
+      flashTimer = 0;
+      batteryLife = 1.0;
+      totalGhosts = 0;
+      ambienceTime = 0;
+      isMoving = false;
+      lastClickTime = 0;
+      camera.position.set(startTile.x, 1.6, startTile.z);
+      camera.rotation.set(0,0,0);
+      titleScreen.style.display = 'flex';
+      clearScreen.style.display = 'none';
+      pauseScreen.style.display = 'none';
+      ghostAnnounceEl.style.display = 'none';
+      flashOverlay.style.background = 'rgba(255,255,220,0)';
+      dreadOverlay.style.opacity = '0.1';
+      scene.fog.density = BASE_FOG_DENSITY;
+      ambientLight.intensity = BASE_AMBIENT_INTENSITY;
+      moon.intensity = BASE_MOON_INTENSITY;
+      flashlight.intensity = 12;
+      flashlight.angle = Math.PI / 3.5;
+      flashlight.penumbra = 0.5;
+      mmCanvas.style.opacity = '1';
+      instructionsEl.style.opacity = '1';
+      updateHUD();
+      drawMinimap();
+      if (document.pointerLockElement === renderer.domElement) {
+        suppressPauseOnUnlock = true;
+        document.exitPointerLock();
+      }
+    }
+
+    function resumeRun() {
+      if (!gameStarted || floorCleared || !pauseOpen) return;
+      pauseOpen = false;
+      pauseScreen.style.display = 'none';
+      instructionsEl.style.opacity = '1';
+      renderer.domElement.requestPointerLock();
+    }
+
     function startRun() {
       clearTimeout(ghostAnnounceTimer);
       clearActiveEnemies();
       gameStarted = true;
       floorCleared = false;
+      pauseOpen = false;
       score = 0;
       flashCharge = 1;
       flashTimer = 0;
       batteryLife = 1.0;
+      ambienceTime = 0;
       isMoving = false;
       lastClickTime = 0;
       camera.position.set(startTile.x, 1.6, startTile.z);
       camera.rotation.set(0,0,0);
       startTime = performance.now();
+      titleScreen.style.display = 'none';
       clearScreen.style.display = 'none';
+      pauseScreen.style.display = 'none';
       ghostAnnounceEl.style.display = 'none';
       flashOverlay.style.background = 'rgba(255,255,220,0)';
       dreadOverlay.style.opacity = '0.1';
@@ -1830,6 +1967,26 @@
     });
     clearScreen.addEventListener('click', () => {
       startRun();
+    });
+    pauseResumeBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      resumeRun();
+    });
+    pauseQuitBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      returnToTitle();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (pauseOpen) {
+        e.preventDefault();
+        returnToTitle();
+        return;
+      }
+      if (gameStarted && !floorCleared && !isPointerLocked) {
+        e.preventDefault();
+        returnToTitle();
+      }
     });
 
     function updateHUD() {
@@ -1873,7 +2030,7 @@
     function animate() {
       requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.05);
-      if (gameStarted && !floorCleared) {
+      if (gameStarted && !floorCleared && !pauseOpen) {
         ambienceTime += dt;
         if (isMoving && isPointerLocked) {
           const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
