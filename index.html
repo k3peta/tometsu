@@ -166,10 +166,44 @@
       background: rgba(0,0,0,0.85);
       display: none; flex-direction: column;
       align-items: center; justify-content: center;
-      z-index: 100; cursor: pointer;
+      z-index: 100;
     }
     #clear-screen h2 { font-family: 'Courier New', monospace; font-size: 36px; color: #8f8; margin-bottom: 16px; }
     #clear-screen p { color: #888; font-family: 'Courier New', monospace; }
+    .clear-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 22px;
+      width: min(92vw, 320px);
+    }
+    .clear-actions button {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid rgba(144,168,144,0.22);
+      background: rgba(18,24,18,0.92);
+      color: #d9e4d5;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .clear-actions button:hover {
+      background: rgba(26,38,26,0.98);
+      border-color: rgba(168,208,168,0.34);
+      color: #eff8eb;
+    }
+    .clear-actions button:last-child {
+      color: #d8c5bf;
+      border-color: rgba(176,132,120,0.24);
+      background: rgba(28,18,18,0.92);
+    }
+    .clear-actions button:last-child:hover {
+      background: rgba(42,22,22,0.98);
+      border-color: rgba(212,168,154,0.34);
+      color: #f6e5df;
+    }
     #pause-screen {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.88);
@@ -264,7 +298,10 @@
   <div id="clear-screen">
     <h2>✨ FLOOR CLEAR ✨</h2>
     <p id="clear-stats"></p>
-    <p style="margin-top:20px;animation:pulse 2s infinite">— クリックで再挑戦 —</p>
+    <div class="clear-actions">
+      <button id="clear-retry" type="button">再挑戦する</button>
+      <button id="clear-title" type="button">タイトルへ戻る</button>
+    </div>
   </div>
   <div id="pause-screen">
     <div class="pause-panel">
@@ -2078,6 +2115,8 @@
     const clearScreen = document.getElementById('clear-screen');
     const pauseScreen = document.getElementById('pause-screen');
     const clearStats = document.getElementById('clear-stats');
+    const clearRetryBtn = document.getElementById('clear-retry');
+    const clearTitleBtn = document.getElementById('clear-title');
     const pauseResumeBtn = document.getElementById('pause-resume');
     const pauseQuitBtn = document.getElementById('pause-quit');
     const shadowCountEl = document.getElementById('shadow-count');
@@ -2281,8 +2320,13 @@
       titleScreen.style.display = 'none';
       startRun();
     });
-    clearScreen.addEventListener('click', () => {
+    clearRetryBtn.addEventListener('click', e => {
+      e.stopPropagation();
       startRun();
+    });
+    clearTitleBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      returnToTitle();
     });
     pauseResumeBtn.addEventListener('click', e => {
       e.stopPropagation();
