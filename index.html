@@ -1492,6 +1492,233 @@
       return tex;
     }
 
+    function makeBlackEyedGhostTexture() {
+      const tex = makeCanvas(256, 512, (ctx, w, h) => {
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        const headTilt = (Math.random() - 0.5) * 8;
+        const faceCx = cx + headTilt;
+        const shoulderY = 150;
+        const hemY = 446 + Math.random() * 10;
+        const robeW = 64 + Math.random() * 10;
+
+        const aura = ctx.createRadialGradient(faceCx, 230, 18, faceCx, 230, 164);
+        aura.addColorStop(0, 'rgba(240,244,255,0.18)');
+        aura.addColorStop(0.45, 'rgba(174,186,220,0.11)');
+        aura.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.ellipse(faceCx, 236, 104, 178, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(24,26,36,0.88)';
+        ctx.beginPath();
+        ctx.moveTo(faceCx, 78);
+        ctx.bezierCurveTo(faceCx - 42, 84, faceCx - 46, 176, faceCx - 28, 214);
+        ctx.quadraticCurveTo(faceCx, 198, faceCx + 28, 214);
+        ctx.bezierCurveTo(faceCx + 48, 174, faceCx + 42, 86, faceCx, 78);
+        ctx.closePath();
+        ctx.fill();
+
+        const faceGlow = ctx.createRadialGradient(faceCx, 148, 8, faceCx, 148, 56);
+        faceGlow.addColorStop(0, 'rgba(244,246,255,0.56)');
+        faceGlow.addColorStop(0.42, 'rgba(228,234,248,0.24)');
+        faceGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = faceGlow;
+        ctx.beginPath();
+        ctx.ellipse(faceCx, 150, 40, 56, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(246,248,255,0.72)';
+        ctx.beginPath();
+        ctx.moveTo(faceCx, 86);
+        ctx.bezierCurveTo(faceCx - 36, 94, faceCx - 44, 164, faceCx - 20, 204);
+        ctx.quadraticCurveTo(faceCx, 220, faceCx + 20, 204);
+        ctx.bezierCurveTo(faceCx + 42, 164, faceCx + 36, 94, faceCx, 86);
+        ctx.closePath();
+        ctx.fill();
+
+        for (const ex of [faceCx - 16, faceCx + 16]) {
+          const voidGlow = ctx.createRadialGradient(ex, 146, 0, ex, 146, 18);
+          voidGlow.addColorStop(0, 'rgba(12,14,22,0.98)');
+          voidGlow.addColorStop(0.55, 'rgba(0,0,0,0.9)');
+          voidGlow.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = voidGlow;
+          ctx.beginPath();
+          ctx.ellipse(ex, 148, 12, 18, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = 'rgba(10,12,18,0.48)';
+        ctx.beginPath();
+        ctx.moveTo(faceCx, 152);
+        ctx.lineTo(faceCx - 6, 178);
+        ctx.lineTo(faceCx + 6, 178);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(12,14,20,0.62)';
+        ctx.beginPath();
+        ctx.ellipse(faceCx, 188, 9, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const robe = ctx.createLinearGradient(0, shoulderY, 0, hemY);
+        robe.addColorStop(0, 'rgba(238,242,255,0.04)');
+        robe.addColorStop(0.12, 'rgba(220,228,248,0.82)');
+        robe.addColorStop(0.62, 'rgba(150,160,190,0.34)');
+        robe.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = robe;
+        ctx.beginPath();
+        ctx.moveTo(faceCx - 30, shoulderY);
+        ctx.bezierCurveTo(cx - robeW * 0.62, 178, cx - robeW - 8, 260, cx - robeW, hemY);
+        ctx.quadraticCurveTo(cx - 14, hemY + 16, faceCx, hemY - 4);
+        ctx.quadraticCurveTo(cx + 14, hemY + 16, cx + robeW, hemY);
+        ctx.bezierCurveTo(cx + robeW + 8, 260, cx + robeW * 0.62, 176, faceCx + 30, shoulderY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(216,224,246,0.10)';
+        for (let i = 0; i < 8; i++) {
+          const sx = cx + (Math.random() - 0.5) * 58;
+          const sy = 214 + Math.random() * 154;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + (Math.random() - 0.5) * 14, sy + 90 + Math.random() * 52);
+          ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        for (let i = 0; i < 5; i++) {
+          const cutX = cx - robeW * 0.58 + Math.random() * robeW * 1.16;
+          ctx.beginPath();
+          ctx.moveTo(cutX, hemY - 12 + Math.random() * 12);
+          ctx.lineTo(cutX + 8 + Math.random() * 8, h);
+          ctx.lineTo(cutX - 8 - Math.random() * 8, h);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    function makeLongHairGhostTexture() {
+      const tex = makeCanvas(256, 512, (ctx, w, h) => {
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        const headTilt = (Math.random() - 0.5) * 6;
+        const faceCx = cx + headTilt;
+        const shoulderY = 154;
+        const hemY = 472;
+        const robeW = 70 + Math.random() * 12;
+
+        const aura = ctx.createRadialGradient(faceCx, 246, 20, faceCx, 246, 170);
+        aura.addColorStop(0, 'rgba(236,242,255,0.16)');
+        aura.addColorStop(0.46, 'rgba(176,188,220,0.12)');
+        aura.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.ellipse(faceCx, 248, 112, 196, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(244,246,255,0.64)';
+        ctx.beginPath();
+        ctx.moveTo(faceCx, 86);
+        ctx.bezierCurveTo(faceCx - 34, 96, faceCx - 42, 166, faceCx - 22, 206);
+        ctx.quadraticCurveTo(faceCx, 220, faceCx + 22, 206);
+        ctx.bezierCurveTo(faceCx + 42, 166, faceCx + 34, 96, faceCx, 86);
+        ctx.closePath();
+        ctx.fill();
+
+        const hair = ctx.createLinearGradient(0, 52, 0, 312);
+        hair.addColorStop(0, 'rgba(18,20,28,0)');
+        hair.addColorStop(0.12, 'rgba(10,10,16,0.96)');
+        hair.addColorStop(0.84, 'rgba(4,4,8,0.9)');
+        hair.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hair;
+        ctx.beginPath();
+        ctx.moveTo(faceCx, 54);
+        ctx.bezierCurveTo(faceCx - 58, 68, faceCx - 72, 196, faceCx - 52, 310);
+        ctx.quadraticCurveTo(faceCx - 12, 286, faceCx, 292);
+        ctx.quadraticCurveTo(faceCx + 12, 286, faceCx + 52, 310);
+        ctx.bezierCurveTo(faceCx + 72, 196, faceCx + 58, 68, faceCx, 54);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(216,220,236,0.10)';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 16; i++) {
+          const sx = faceCx - 44 + Math.random() * 88;
+          const sy = 78 + Math.random() * 60;
+          const ex = sx + (Math.random() - 0.5) * 28;
+          const ey = 238 + Math.random() * 84;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.bezierCurveTo(
+            sx + (Math.random() - 0.5) * 14,
+            sy + 46,
+            ex + (Math.random() - 0.5) * 16,
+            ey - 42,
+            ex,
+            ey
+          );
+          ctx.stroke();
+        }
+
+        const hiddenEye = ctx.createRadialGradient(faceCx + 10, 164, 0, faceCx + 10, 164, 12);
+        hiddenEye.addColorStop(0, 'rgba(240,246,255,0.20)');
+        hiddenEye.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = hiddenEye;
+        ctx.beginPath();
+        ctx.ellipse(faceCx + 10, 164, 7, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const robe = ctx.createLinearGradient(0, shoulderY, 0, hemY);
+        robe.addColorStop(0, 'rgba(238,242,255,0.05)');
+        robe.addColorStop(0.14, 'rgba(228,236,252,0.80)');
+        robe.addColorStop(0.6, 'rgba(150,162,196,0.34)');
+        robe.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = robe;
+        ctx.beginPath();
+        ctx.moveTo(faceCx - 30, shoulderY);
+        ctx.bezierCurveTo(cx - robeW * 0.66, 178, cx - robeW - 10, 272, cx - robeW, hemY);
+        ctx.quadraticCurveTo(cx - 16, hemY + 18, faceCx, hemY - 2);
+        ctx.quadraticCurveTo(cx + 16, hemY + 18, cx + robeW, hemY);
+        ctx.bezierCurveTo(cx + robeW + 10, 272, cx + robeW * 0.66, 178, faceCx + 30, shoulderY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(214,224,246,0.08)';
+        for (let i = 0; i < 9; i++) {
+          const sx = cx + (Math.random() - 0.5) * 62;
+          const sy = 240 + Math.random() * 156;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + (Math.random() - 0.5) * 18, sy + 94 + Math.random() * 46);
+          ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        for (let i = 0; i < 7; i++) {
+          const cutX = cx - robeW * 0.7 + Math.random() * robeW * 1.4;
+          ctx.beginPath();
+          ctx.moveTo(cutX, hemY - 10 + Math.random() * 10);
+          ctx.lineTo(cutX + 8 + Math.random() * 10, h);
+          ctx.lineTo(cutX - 8 - Math.random() * 10, h);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
     class ShadowFigure {
       constructor(x, z, rotY) {
         this.group = new THREE.Group();
@@ -1866,6 +2093,52 @@
       }
     }
 
+    class ShadowBlackEyedGhost extends ShadowGirlGhost {
+      constructor(x, z, rotY) {
+        super(x, z, rotY);
+        const tex = makeBlackEyedGhostTexture();
+        this.planeMaterials.forEach(layer => {
+          layer.mat.map = tex;
+          layer.mat.needsUpdate = true;
+        });
+        this.auraMat.map = tex;
+        this.auraMat.color.setHex(0x8894b0);
+        this.auraMat.needsUpdate = true;
+        this.hp = 0.72;
+      }
+      destroy() {
+        if (!this.alive) return;
+        super.destroy();
+        score += 1;
+      }
+    }
+
+    class ShadowLongHairGhost extends ShadowGirlGhost {
+      constructor(x, z, rotY) {
+        super(x, z, rotY);
+        const tex = makeLongHairGhostTexture();
+        this.planeMaterials.forEach(layer => {
+          layer.mat.map = tex;
+          layer.mat.needsUpdate = true;
+        });
+        this.auraMat.map = tex;
+        this.auraMat.color.setHex(0x7f88a2);
+        this.auraMat.needsUpdate = true;
+        this.hp = 0.78;
+      }
+      update(dt, playerPos, playerDir) {
+        super.update(dt, playerPos, playerDir);
+        if (!this.alive) return;
+        this.visual.scale.x *= 0.94;
+        this.visual.scale.y *= 1.08;
+      }
+      destroy() {
+        if (!this.alive) return;
+        super.destroy();
+        score += 1;
+      }
+    }
+
     class ShadowBigHeadGhost {
       constructor(x, z, rotY) {
         this.group = new THREE.Group();
@@ -2106,9 +2379,13 @@
       const candidates = buildFigureSpawnCandidates();
       const placed = [];
       let girlsPlaced = 0;
+      let blackEyesPlaced = 0;
+      let longHairPlaced = 0;
       let bigHeadsPlaced = 0;
-      const girlTarget = count >= 3 ? Math.max(1, Math.round(count * 0.42)) : 0;
-      const bigHeadTarget = count >= 4 ? Math.max(1, Math.round(count * 0.24)) : 0;
+      const girlTarget = count >= 3 ? Math.max(1, Math.round(count * 0.28)) : 0;
+      const blackEyeTarget = count >= 4 ? Math.max(1, Math.round(count * 0.18)) : 0;
+      const longHairTarget = count >= 4 ? Math.max(1, Math.round(count * 0.16)) : 0;
+      const bigHeadTarget = count >= 4 ? Math.max(1, Math.round(count * 0.18)) : 0;
       for (const cand of candidates) {
         if (placed.length >= count) break;
         if (placed.some(p => Math.abs(p.c - cand.c) <= 1 && Math.abs(p.r - cand.r) <= 1)) continue;
@@ -2116,14 +2393,20 @@
         const spawnX = x + (Math.random() - 0.5) * cand.jitter;
         const spawnZ = z + (Math.random() - 0.5) * cand.jitter;
         const spawnRot = Math.random() * Math.PI * 2;
-        const useGirl = girlsPlaced < girlTarget && (placed.length === 0 || Math.random() < 0.62);
-        const useBigHead = !useGirl && bigHeadsPlaced < bigHeadTarget && Math.random() < 0.5;
+        const useGirl = girlsPlaced < girlTarget && (placed.length === 0 || Math.random() < 0.5);
+        const useBlackEyes = !useGirl && blackEyesPlaced < blackEyeTarget && Math.random() < 0.48;
+        const useLongHair = !useGirl && !useBlackEyes && longHairPlaced < longHairTarget && Math.random() < 0.44;
+        const useBigHead = !useGirl && !useBlackEyes && !useLongHair && bigHeadsPlaced < bigHeadTarget && Math.random() < 0.44;
         figures.push(
           useGirl ? new ShadowGirlGhost(spawnX, spawnZ, spawnRot)
+          : useBlackEyes ? new ShadowBlackEyedGhost(spawnX, spawnZ, spawnRot)
+          : useLongHair ? new ShadowLongHairGhost(spawnX, spawnZ, spawnRot)
           : useBigHead ? new ShadowBigHeadGhost(spawnX, spawnZ, spawnRot)
           : new ShadowFigure(spawnX, spawnZ, spawnRot)
         );
         if (useGirl) girlsPlaced++;
+        if (useBlackEyes) blackEyesPlaced++;
+        if (useLongHair) longHairPlaced++;
         if (useBigHead) bigHeadsPlaced++;
         placed.push(cand);
       }
