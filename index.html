@@ -8,12 +8,29 @@
     body { overflow: hidden; background: #000; cursor: none; }
     canvas { display: block; }
     #hud {
-      position: fixed; top: 0; left: 0; right: 0;
+      position: fixed; top: 0; left: 0;
       padding: 16px 24px;
-      display: flex; justify-content: space-between;
+      display: flex; gap: 18px; align-items: center;
       font-family: 'Courier New', monospace;
       color: #aaa; font-size: 14px;
       pointer-events: none; z-index: 10;
+    }
+    #purified-hud {
+      position: fixed; top: 14px; right: 24px;
+      display: flex; align-items: baseline; gap: 10px;
+      pointer-events: none; z-index: 10;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 0 18px rgba(228, 238, 255, 0.12);
+    }
+    #purified-hud .label {
+      color: #8f978d;
+      font-size: 11px;
+      letter-spacing: 0.34em;
+    }
+    #purified-count {
+      color: #e4ece0;
+      font-size: 24px;
+      letter-spacing: 0.08em;
     }
     #crosshair {
       position: fixed; top: 50%; left: 50%;
@@ -261,8 +278,12 @@
     </div>
   </div>
   <div id="hud">
-    <span id="shadow-count">SHADOWS: 0</span>
+    <span id="shadow-count">REMAINING: 0</span>
     <span id="flash-charge">FLASH: ████████████</span>
+  </div>
+  <div id="purified-hud">
+    <span class="label">PURGED</span>
+    <span id="purified-count">0/18</span>
   </div>
   <div id="crosshair"></div>
   <div id="flash-overlay"></div>
@@ -278,6 +299,8 @@
     import * as THREE from 'three';
 
     // ===== Game State =====
+    const TARGET_GHOST_COUNT = 18;
+    const BASE_WALL_GHOST_COUNT = 6;
     let gameStarted = false, isPointerLocked = false, isMoving = false;
     let flashCharge = 1.0, shadows = [], score = 0, startTime = 0;
     let batteryLife = 1.0; // 1.0 = full, decays to 0.3 over time
@@ -375,6 +398,14 @@
       tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.needsUpdate = true;
       return tex;
+    }
+
+    function shuffleInPlace(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
     }
 
     // Brick wall texture
@@ -693,6 +724,35 @@
     // ===== Shadow Figures (destroyable 3D ghosts) =====
     let figures = [];
 
+    function findFigurePhaseTarget(origin, avoidPos) {
+      const start = w2t(origin.x, origin.z);
+      const directions = shuffleInPlace([
+        { dc: 1, dr: 0 }, { dc: -1, dr: 0 }, { dc: 0, dr: 1 }, { dc: 0, dr: -1 },
+        { dc: 1, dr: 1 }, { dc: 1, dr: -1 }, { dc: -1, dr: 1 }, { dc: -1, dr: -1 },
+      ]);
+
+      for (const dir of directions) {
+        let crossedWall = false;
+        for (let step = 1; step <= 6; step++) {
+          const c = start.c + dir.dc * step;
+          const r = start.r + dir.dr * step;
+          if (c < 1 || c >= COLS - 1 || r < 1 || r >= ROWS - 1) break;
+          if (!crossedWall) {
+            if (isWall(c, r)) crossedWall = true;
+            continue;
+          }
+          if (isWall(c, r)) continue;
+          const { x, z } = t2w(c, r);
+          if (avoidPos && Math.hypot(x - avoidPos.x, z - avoidPos.z) < 2.6) continue;
+          return {
+            x: x + (Math.random() - 0.5) * 0.5,
+            z: z + (Math.random() - 0.5) * 0.5,
+          };
+        }
+      }
+      return null;
+    }
+
     function makeShadowFigureTexture() {
       const tex = makeCanvas(256, 512, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
@@ -822,11 +882,19 @@
         this.group.add(this.visual);
         this.materials = [];
         this.tintMaterials = [];
+        this.planeMaterials = [];
         this.baseOpacity = 0.3 + Math.random() * 0.08;
         this.height = 1.85 + Math.random() * 0.18;
         this.width = 0.92 + Math.random() * 0.12;
         this.swayPhase = Math.random() * Math.PI * 2;
         this.floatPhase = Math.random() * Math.PI * 2;
+        this.phaseCooldown = 4 + Math.random() * 8;
+        this.phaseDuration = 1.2;
+        this.phaseProgress = 0;
+        this.isPhasing = false;
+        this.phaseStart = new THREE.Vector3();
+        this.phaseTarget = new THREE.Vector3();
+        this.phaseHeading = rotY;
 
         const figureTex = makeShadowFigureTexture();
         const planeDefs = [
@@ -853,6 +921,7 @@
           plane.rotation.y = def.rot;
           this.visual.add(plane);
           this.materials.push(mat);
+          this.planeMaterials.push({ mat, baseOpacity: this.baseOpacity * def.opacity });
           this.tintMaterials.push(mat);
         });
 
@@ -870,6 +939,8 @@
         aura.rotation.y = Math.PI / 4;
         this.visual.add(aura);
         this.materials.push(auraMat);
+        this.auraMat = auraMat;
+        this.auraBaseOpacity = auraMat.opacity;
 
         const floorShadowMat = new THREE.MeshBasicMaterial({
           color: 0x050508,
@@ -883,6 +954,8 @@
         floorShadow.scale.set(1.1, 0.75, 1);
         this.group.add(floorShadow);
         this.materials.push(floorShadowMat);
+        this.floorShadowMat = floorShadowMat;
+        this.floorShadowBaseOpacity = floorShadowMat.opacity;
 
         this.group.position.set(x, 0, z);
         this.group.rotation.y = rotY;
@@ -892,14 +965,49 @@
         scene.add(this.group);
       }
       get mesh() { return this.group; } // for position reference
-      update(dt) {
+      startPhaseShift(playerPos) {
+        const target = findFigurePhaseTarget(this.group.position, playerPos);
+        if (!target) {
+          this.phaseCooldown = 2 + Math.random() * 4;
+          return;
+        }
+        this.isPhasing = true;
+        this.phaseProgress = 0;
+        this.phaseDuration = 0.9 + Math.random() * 0.9;
+        this.phaseStart.copy(this.group.position);
+        this.phaseTarget.set(target.x, 0, target.z);
+        this.phaseHeading = Math.atan2(this.phaseTarget.x - this.phaseStart.x, this.phaseTarget.z - this.phaseStart.z);
+      }
+      update(dt, playerPos) {
         if (!this.alive) return;
+        if (!this.isPhasing) {
+          const playerDist = playerPos ? playerPos.distanceTo(this.group.position) : Infinity;
+          this.phaseCooldown -= dt * (playerDist < 8 ? 1.35 : 0.75);
+          if (this.phaseCooldown <= 0) this.startPhaseShift(playerPos);
+        } else {
+          this.phaseProgress = Math.min(1, this.phaseProgress + dt / this.phaseDuration);
+          const eased = 0.5 - Math.cos(this.phaseProgress * Math.PI) * 0.5;
+          this.group.position.lerpVectors(this.phaseStart, this.phaseTarget, eased);
+          this.group.rotation.y = this.phaseHeading;
+          if (this.phaseProgress >= 1) {
+            this.isPhasing = false;
+            this.phaseCooldown = 5 + Math.random() * 8;
+          }
+        }
         this.swayPhase += dt * 1.4;
         this.floatPhase += dt * 1.9;
-        this.visual.rotation.z = Math.sin(this.swayPhase) * 0.018;
-        this.visual.position.y = Math.sin(this.floatPhase) * 0.03;
-        this.visual.scale.x = 1 + Math.sin(this.swayPhase * 0.7) * 0.015;
-        this.visual.scale.y = 1 + Math.cos(this.floatPhase * 0.8) * 0.02;
+        const phasePulse = this.isPhasing ? Math.sin(this.phaseProgress * Math.PI) : 0;
+        this.visual.rotation.z = Math.sin(this.swayPhase) * 0.018 + phasePulse * 0.06;
+        this.visual.position.y = Math.sin(this.floatPhase) * 0.03 + phasePulse * 0.1;
+        this.visual.scale.x = 1 + Math.sin(this.swayPhase * 0.7) * 0.015 + phasePulse * 0.03;
+        this.visual.scale.y = 1 + Math.cos(this.floatPhase * 0.8) * 0.02 + phasePulse * 0.06;
+
+        const planeAlpha = this.isPhasing ? 0.44 + phasePulse * 0.26 : 1;
+        this.planeMaterials.forEach(layer => {
+          layer.mat.opacity = layer.baseOpacity * planeAlpha;
+        });
+        this.auraMat.opacity = this.auraBaseOpacity * (this.isPhasing ? 2.6 + phasePulse * 1.2 : 1);
+        this.floorShadowMat.opacity = this.floorShadowBaseOpacity * (this.isPhasing ? 0.4 : 1);
 
         if (this.hitTimer > 0) {
           this.hitTimer -= dt;
@@ -932,34 +1040,63 @@
     }
 
     // Spawn figures: clusters in generated rooms
-    function spawnFigures() {
-      if (genRooms.length < 2) return;
-      // Pick 2 random rooms (not the spawn room) for clusters
-      const otherRooms = genRooms.slice(1);
-      for (let i = otherRooms.length-1; i > 0; i--) { const j=Math.floor(Math.random()*(i+1)); [otherRooms[i],otherRooms[j]]=[otherRooms[j],otherRooms[i]]; }
-      const clusterCount = Math.min(2, otherRooms.length);
-      for (let ri = 0; ri < clusterCount; ri++) {
-        const rm = otherRooms[ri];
-        const count = 3 + Math.floor(Math.random()*3);
-        for (let i = 0; i < count; i++) {
-          const fr = rm.y + Math.floor(Math.random()*rm.h);
-          const fc = rm.x + Math.floor(Math.random()*rm.w);
-          if (isWall(fc, fr)) continue;
-          const {x, z} = t2w(fc, fr);
-          figures.push(new ShadowFigure(x + (Math.random()-0.5)*0.8, z + (Math.random()-0.5)*0.8, Math.random()*Math.PI*2));
+    function buildFigureSpawnCandidates() {
+      const roomTiles = [];
+      const corridorTiles = [];
+      const fallbackTiles = [];
+      const seen = new Set();
+      const push = (bucket, c, r, jitter) => {
+        if (isWall(c, r)) return;
+        const key = `${c},${r}`;
+        if (seen.has(key)) return;
+        const distFromSpawn = Math.abs(c - spawnRoom.cx) + Math.abs(r - spawnRoom.cy);
+        if (distFromSpawn < 4) return;
+        seen.add(key);
+        bucket.push({ c, r, jitter });
+      };
+
+      genRooms.slice(1).forEach(rm => {
+        for (let r = rm.y; r < rm.y + rm.h; r++) {
+          for (let c = rm.x; c < rm.x + rm.w; c++) {
+            push(roomTiles, c, r, 0.72);
+          }
+        }
+      });
+
+      for (let r = 2; r < ROWS - 2; r++) for (let c = 2; c < COLS - 2; c++) {
+        if (isWall(c, r)) continue;
+        const lr = isWall(c - 1, r) && isWall(c + 1, r);
+        const tb = isWall(c, r - 1) && isWall(c, r + 1);
+        if (lr || tb) push(corridorTiles, c, r, 0.34);
+      }
+
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          push(fallbackTiles, c, r, 0.48);
         }
       }
-      // Also 1-2 in a corridor-like area (narrow passage)
-      for (let r = 2; r < ROWS-2; r++) for (let c = 2; c < COLS-2; c++) {
-        if (isWall(c,r)) continue;
-        // Detect corridor: open but walls on 2 opposite sides
-        const lr = isWall(c-1,r) && isWall(c+1,r);
-        const tb = isWall(c,r-1) && isWall(c,r+1);
-        if ((lr||tb) && Math.random() < 0.08) {
-          const {x, z} = t2w(c, r);
-          figures.push(new ShadowFigure(x, z, Math.random()*Math.PI*2));
-        }
+
+      shuffleInPlace(roomTiles);
+      shuffleInPlace(corridorTiles);
+      shuffleInPlace(fallbackTiles);
+      return [...roomTiles, ...corridorTiles, ...fallbackTiles];
+    }
+
+    function spawnFigures(count) {
+      const candidates = buildFigureSpawnCandidates();
+      const placed = [];
+      for (const cand of candidates) {
+        if (placed.length >= count) break;
+        if (placed.some(p => Math.abs(p.c - cand.c) <= 1 && Math.abs(p.r - cand.r) <= 1)) continue;
+        const { x, z } = t2w(cand.c, cand.r);
+        figures.push(new ShadowFigure(
+          x + (Math.random() - 0.5) * cand.jitter,
+          z + (Math.random() - 0.5) * cand.jitter,
+          Math.random() * Math.PI * 2
+        ));
+        placed.push(cand);
       }
+      return placed.length;
     }
 
     // ===== Lights =====
@@ -1712,7 +1849,7 @@
         score+=5;
       }
     }
-    function spawnBoss(){
+    function spawnBosses(count) {
       const wf=[];
       for(let r=2;r<ROWS-2;r++) for(let c=2;c<COLS-2;c++){
         if(isWall(c,r)){
@@ -1727,26 +1864,50 @@
           wf.push({x,z,nx:0,nz:0,ny:-1});
         }
       }
-      if(!wf.length)return;
+      if(!wf.length)return 0;
       // Filter to faces far from player
       const px = camera.position.x, pz = camera.position.z;
       const farFaces = wf.filter(f => {
         const dx=f.x-px, dz=f.z-pz;
         return Math.sqrt(dx*dx+dz*dz) > 8;
       });
-      const pool = farFaces.length > 0 ? farFaces : wf;
-      const types=['snake','lizard','bird'];
-      bosses.push(new ShadowBoss(pool[Math.floor(Math.random()*pool.length)],types[Math.floor(Math.random()*3)]));
+      const pool = shuffleInPlace([...(farFaces.length > 0 ? farFaces : wf)]);
+      const chosen = [];
+      for (const face of pool) {
+        if (chosen.length >= count) break;
+        const separated = chosen.every(other => Math.hypot(other.x - face.x, other.z - face.z) > 4.2 || other.ny !== face.ny);
+        if (separated) chosen.push(face);
+      }
+      for (const face of pool) {
+        if (chosen.length >= count) break;
+        if (!chosen.includes(face)) chosen.push(face);
+      }
+      const types = shuffleInPlace(['snake','lizard','bird']);
+      chosen.slice(0, count).forEach((face, index) => {
+        bosses.push(new ShadowBoss(face, types[index % types.length]));
+      });
+      return Math.min(count, chosen.length);
     }
 
     // ===== Whisper BGM =====
     let audioCtx;
+    let bgmSource = null;
+    let bgmGain = null;
+    let bgmStopHandle = 0;
     function startWhisperBGM() {
-      if (audioCtx) {
-        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      if (bgmStopHandle) {
+        clearTimeout(bgmStopHandle);
+        bgmStopHandle = 0;
+      }
+      if (bgmSource && bgmGain) {
+        const now = audioCtx.currentTime;
+        bgmGain.gain.cancelScheduledValues(now);
+        bgmGain.gain.setValueAtTime(Math.max(0.0001, bgmGain.gain.value), now);
+        bgmGain.gain.linearRampToValueAtTime(0.1, now + 0.9);
         return;
       }
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const sr = audioCtx.sampleRate;
       const buf = audioCtx.createBuffer(2, sr*4, sr);
       for (let ch = 0; ch < 2; ch++) {
@@ -1765,11 +1926,39 @@
       const rb = audioCtx.createBuffer(2, sr*2, sr);
       for (let ch=0;ch<2;ch++) { const rd=rb.getChannelData(ch); for(let i=0;i<rd.length;i++) rd[i]=(Math.random()*2-1)*Math.exp(-i/(sr*0.5)); }
       rev.buffer = rb;
-      const gain = audioCtx.createGain(); gain.gain.value = 0.1;
+      const gain = audioCtx.createGain(); gain.gain.value = 0.0001;
       src.connect(bp1); src.connect(bp2);
       bp1.connect(rev); bp2.connect(rev);
       rev.connect(gain); gain.connect(audioCtx.destination);
       src.start();
+      bgmSource = src;
+      bgmGain = gain;
+      src.onended = () => {
+        if (bgmSource === src) {
+          bgmSource = null;
+          bgmGain = null;
+        }
+      };
+      gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 1.2);
+    }
+
+    function stopWhisperBGM(fadeOut = 1.4) {
+      if (!audioCtx || !bgmSource || !bgmGain) return;
+      if (bgmStopHandle) clearTimeout(bgmStopHandle);
+      const now = audioCtx.currentTime;
+      const source = bgmSource;
+      const gain = bgmGain;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOut);
+      bgmStopHandle = window.setTimeout(() => {
+        try { source.stop(); } catch (e) {}
+        if (bgmSource === source) {
+          bgmSource = null;
+          bgmGain = null;
+        }
+        bgmStopHandle = 0;
+      }, Math.ceil(fadeOut * 1000) + 120);
     }
 
     function spawnShadows(count) {
@@ -1789,12 +1978,13 @@
         }
       }
       // Shuffle both
-      for (let i = wallFaces.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [wallFaces[i],wallFaces[j]]=[wallFaces[j],wallFaces[i]]; }
-      for (let i = ceilFaces.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [ceilFaces[i],ceilFaces[j]]=[ceilFaces[j],ceilFaces[i]]; }
+      shuffleInPlace(wallFaces);
+      shuffleInPlace(ceilFaces);
 
       // 70% on walls, 30% on ceiling
       const wallCount = Math.ceil(count * 0.7);
       const ceilCount = count - wallCount;
+      let spawned = 0;
 
       for (let i = 0; i < Math.min(wallCount, wallFaces.length); i++) {
         const f = wallFaces[i];
@@ -1802,6 +1992,7 @@
           new THREE.Vector3(f.x, 0.8+Math.random()*1.5, f.z),
           new THREE.Vector3(f.nx, 0, f.nz)
         ));
+        spawned++;
       }
       for (let i = 0; i < Math.min(ceilCount, ceilFaces.length); i++) {
         const f = ceilFaces[i];
@@ -1809,7 +2000,9 @@
           new THREE.Vector3(f.x, CH - 0.02, f.z),
           new THREE.Vector3(0, -1, 0)
         ));
+        spawned++;
       }
+      return spawned;
     }
 
     // ===== Controls =====
@@ -1820,6 +2013,7 @@
     const pauseResumeBtn = document.getElementById('pause-resume');
     const pauseQuitBtn = document.getElementById('pause-quit');
     const shadowCountEl = document.getElementById('shadow-count');
+    const purifiedCountEl = document.getElementById('purified-count');
     const flashChargeEl = document.getElementById('flash-charge');
     const flashOverlay = document.getElementById('flash-overlay');
     const dreadOverlay = document.getElementById('dread-overlay');
@@ -1909,8 +2103,19 @@
       }, 4200);
     }
 
+    function spawnEncounter() {
+      const bossCount = Math.random() < 0.38 ? 2 : 1;
+      spawnShadows(BASE_WALL_GHOST_COUNT);
+      const spawnedBosses = spawnBosses(bossCount);
+      spawnFigures(TARGET_GHOST_COUNT - BASE_WALL_GHOST_COUNT - spawnedBosses);
+      const remainder = TARGET_GHOST_COUNT - countAliveEnemies();
+      if (remainder > 0) spawnShadows(remainder);
+      totalGhosts = countAliveEnemies();
+    }
+
     function returnToTitle() {
       clearTimeout(ghostAnnounceTimer);
+      stopWhisperBGM(0.9);
       clearActiveEnemies();
       gameStarted = false;
       floorCleared = false;
@@ -1987,10 +2192,7 @@
       flashlight.penumbra = FLASHLIGHT_BASE_PENUMBRA;
       mmCanvas.style.opacity = '1';
       instructionsEl.style.opacity = '1';
-      spawnShadows(6);
-      spawnFigures();
-      spawnBoss();
-      totalGhosts = countAliveEnemies();
+      spawnEncounter();
       updateHUD();
       showGhostAnnouncement();
       try { startWhisperBGM(); } catch (e) {}
@@ -2027,7 +2229,10 @@
 
     function updateHUD() {
       const alive = countAliveEnemies();
-      shadowCountEl.textContent = `SHADOWS: ${alive}`;
+      shadowCountEl.textContent = `REMAINING: ${alive}`;
+      const displayTotal = totalGhosts || TARGET_GHOST_COUNT;
+      const purified = gameStarted ? Math.max(0, displayTotal - alive) : 0;
+      purifiedCountEl.textContent = `${purified}/${displayTotal}`;
       const bars = Math.round(flashCharge*12);
       flashChargeEl.textContent = `FLASH: ${'█'.repeat(bars)}${'░'.repeat(12-bars)}`;
     }
@@ -2038,6 +2243,7 @@
       const t = ((performance.now()-startTime)/1000).toFixed(1);
       clearStats.textContent = `${totalGhosts} ghosts cleared / ${t}s / SCORE ${score}`;
       clearScreen.style.display = 'flex';
+      stopWhisperBGM(1.6);
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
     }
 
@@ -2111,7 +2317,7 @@
         mmCanvas.style.opacity = (0.3 + batteryLife * 0.7).toFixed(2);
         const pDir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
         shadows.forEach(s => s.update(dt, camera.position, pDir));
-        figures.forEach(f => f.update(dt));
+        figures.forEach(f => f.update(dt, camera.position));
         bosses.forEach(b => b.update(dt));
         updateHUD(); checkClear(); drawMinimap();
         if ((performance.now()-startTime)/1000 > 5) instructionsEl.style.opacity = '0';
