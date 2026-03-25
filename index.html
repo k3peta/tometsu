@@ -2455,13 +2455,13 @@
 
     // ===== Lights =====
     const BATTERY_MIN_LIFE = 0.15;
-    const FLASHLIGHT_BASE_INTENSITY = 12;
+    const FLASHLIGHT_BASE_INTENSITY = 13;
     const FLASHLIGHT_FLASH_INTENSITY = 40;
-    const FLASHLIGHT_BASE_DISTANCE = 36;
-    const FLASHLIGHT_MIN_DISTANCE = 8;
-    const FLASHLIGHT_BASE_ANGLE = Math.PI / 4.25;
-    const FLASHLIGHT_MIN_ANGLE = Math.PI / 11.5;
-    const FLASHLIGHT_BASE_PENUMBRA = 0.38;
+    const FLASHLIGHT_BASE_DISTANCE = 38;
+    const FLASHLIGHT_MIN_DISTANCE = 10;
+    const FLASHLIGHT_BASE_ANGLE = Math.PI / 4.45;
+    const FLASHLIGHT_MIN_ANGLE = Math.PI / 12.2;
+    const FLASHLIGHT_BASE_PENUMBRA = 0.28;
     const flashlight = new THREE.SpotLight(
       0xfff8dd,
       FLASHLIGHT_BASE_INTENSITY,
@@ -3853,7 +3853,7 @@
     function doFlash() {
       if (flashCharge < 0.3) return;
       flashCharge -= 0.3;
-      flashTimer = 0.15;
+      flashTimer = 0.24;
       flashOverlay.style.background = 'rgba(255,255,220,0.5)';
       const fd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
       shadows.forEach(s => {
@@ -4037,7 +4037,7 @@
       pauseScreen.style.display = 'none';
       ghostAnnounceEl.style.display = 'none';
       flashOverlay.style.background = 'rgba(255,255,220,0)';
-      dreadOverlay.style.opacity = '0.14';
+      dreadOverlay.style.opacity = '0.12';
       scene.fog.density = BASE_FOG_DENSITY;
       ambientLight.intensity = BASE_AMBIENT_INTENSITY;
       moon.intensity = BASE_MOON_INTENSITY;
@@ -4089,7 +4089,7 @@
       pauseScreen.style.display = 'none';
       ghostAnnounceEl.style.display = 'none';
       flashOverlay.style.background = 'rgba(255,255,220,0)';
-      dreadOverlay.style.opacity = '0.14';
+      dreadOverlay.style.opacity = '0.12';
       scene.fog.density = BASE_FOG_DENSITY;
       ambientLight.intensity = BASE_AMBIENT_INTENSITY;
       moon.intensity = BASE_MOON_INTENSITY;
@@ -4218,24 +4218,26 @@
         const reachFade = Math.pow(batteryFear, 1.15);
         const flickerStrength = batteryLife < 0.55 ? Math.min(1, (0.55 - batteryLife) / 0.25) : 0;
         const flicker = 1 - flickerStrength * (0.08 + 0.08 * Math.max(0, Math.sin(ambienceTime * 34 + dread * 6)));
-        const beamDistance = THREE.MathUtils.lerp(FLASHLIGHT_BASE_DISTANCE, FLASHLIGHT_MIN_DISTANCE, reachFade) * (1 - dread * 0.08);
+        const beamDistance = THREE.MathUtils.lerp(FLASHLIGHT_BASE_DISTANCE, FLASHLIGHT_MIN_DISTANCE, reachFade) * (1 - dread * 0.06);
         const beamAngle = THREE.MathUtils.lerp(FLASHLIGHT_BASE_ANGLE, FLASHLIGHT_MIN_ANGLE, reachFade);
+        const beamIntensity = THREE.MathUtils.lerp(1, 0.66, reachFade);
+        const flashBeamIntensity = THREE.MathUtils.lerp(1, 0.84, reachFade);
 
         ambientLight.intensity = BASE_AMBIENT_INTENSITY - dread * 0.55;
         moon.intensity = BASE_MOON_INTENSITY - dread * 0.12;
-        scene.fog.density = BASE_FOG_DENSITY + dread * 0.02 + batteryFear * 0.008 + Math.sin(ambienceTime * 1.1) * 0.0014 * proximityFear;
-        dreadOverlay.style.opacity = (0.14 + dread * 0.34 + batteryFear * 0.08 + Math.max(0, Math.sin(ambienceTime * 2.4)) * 0.025 * proximityFear).toFixed(2);
+        scene.fog.density = BASE_FOG_DENSITY + dread * 0.016 + batteryFear * 0.004 + Math.sin(ambienceTime * 1.1) * 0.0012 * proximityFear;
+        dreadOverlay.style.opacity = (0.12 + dread * 0.28 + batteryFear * 0.05 + Math.max(0, Math.sin(ambienceTime * 2.4)) * 0.02 * proximityFear).toFixed(2);
         flashlight.distance = beamDistance;
-        flashlight.angle = Math.max(FLASHLIGHT_MIN_ANGLE * 0.9, beamAngle - dread * 0.078);
-        flashlight.penumbra = THREE.MathUtils.clamp(FLASHLIGHT_BASE_PENUMBRA - reachFade * 0.14 + dread * 0.08, 0.14, 0.5);
+        flashlight.angle = Math.max(FLASHLIGHT_MIN_ANGLE * 0.92, beamAngle - dread * 0.05);
+        flashlight.penumbra = THREE.MathUtils.clamp(FLASHLIGHT_BASE_PENUMBRA - reachFade * 0.09 + dread * 0.04, 0.08, 0.34);
 
         if (flashTimer > 0) {
           flashTimer = Math.max(0, flashTimer - dt);
-          flashlight.intensity = FLASHLIGHT_FLASH_INTENSITY * batteryLife * (1 - dread * 0.1) * flicker;
-          flashlight.distance = beamDistance * 1.04;
+          flashlight.intensity = FLASHLIGHT_FLASH_INTENSITY * flashBeamIntensity * (1 - dread * 0.06) * flicker;
+          flashlight.distance = beamDistance * 1.08;
           flashOverlay.style.background = 'rgba(255,255,220,0.5)';
         } else {
-          flashlight.intensity = FLASHLIGHT_BASE_INTENSITY * batteryLife * (1 - dread * 0.1) * flicker;
+          flashlight.intensity = FLASHLIGHT_BASE_INTENSITY * beamIntensity * (1 - dread * 0.06) * flicker;
           flashOverlay.style.background = 'rgba(255,255,220,0)';
         }
         // Minimap fades with battery
