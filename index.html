@@ -2511,7 +2511,7 @@
     function showGhostAnnouncement(floorState = currentFloor) {
       clearTimeout(ghostAnnounceTimer);
       if (floorState.cleared) {
-        ghostAnnounceTextEl.textContent = `${floorState.label} はすでに浄化されている……`;
+        ghostAnnounceTextEl.textContent = 'このフロアからはもうゴーストの存在を感じない……';
       } else {
         ghostAnnounceTextEl.textContent = `${floorState.label} には ${floorState.totalGhosts} 体のゴーストがいる……`;
       }
