@@ -27,6 +27,10 @@
       font-size: 11px;
       letter-spacing: 0.34em;
     }
+    #floor-name {
+      color: #d4d8cb;
+      letter-spacing: 0.18em;
+    }
     #purified-count {
       color: #e4ece0;
       font-size: 24px;
@@ -62,6 +66,14 @@
       color: #888; font-family: 'Courier New', monospace; font-size: 13px;
       text-align: center; pointer-events: none; z-index: 10;
       transition: opacity 1s;
+    }
+    #stairs-prompt {
+      position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%);
+      color: #d8ddd0; font-family: 'Courier New', monospace; font-size: 13px;
+      letter-spacing: 0.08em;
+      text-align: center; pointer-events: none; z-index: 11;
+      opacity: 0; transition: opacity 0.15s;
+      text-shadow: 0 0 18px rgba(220, 232, 255, 0.18);
     }
     #title-screen {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -315,6 +327,7 @@
     </div>
   </div>
   <div id="hud">
+    <span id="floor-name">FLOOR: B1</span>
     <span id="shadow-count">REMAINING: 0</span>
     <span id="flash-charge">FLASH: ████████████</span>
   </div>
@@ -325,7 +338,8 @@
   <div id="crosshair"></div>
   <div id="flash-overlay"></div>
   <div id="dread-overlay"></div>
-  <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ ｜ Esc: 中断</div>
+  <div id="stairs-prompt"></div>
+  <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ ｜ E: 階段 ｜ Esc: 中断</div>
   <canvas id="minimap" width="210" height="170"></canvas>
   <div id="ghost-announce"><p id="ghost-announce-text"></p></div>
 
@@ -341,16 +355,24 @@
     const MIN_WALL_GHOST_COUNT = 2;
     const MAX_WALL_GHOST_COUNT = 4;
     let gameStarted = false, isPointerLocked = false, isMoving = false;
-    let flashCharge = 1.0, shadows = [], score = 0, startTime = 0;
+    let flashCharge = 1.0, shadows = [], figures = [], bosses = [], score = 0, startTime = 0;
     let batteryLife = 1.0; // 1.0 = full, decays to 0.3 over time
     let flashTimer = 0, floorCleared = false, totalGhosts = 0, ghostAnnounceTimer = 0;
     let ambienceTime = 0, pauseOpen = false, suppressPauseOnUnlock = false;
+    let stairUseCooldown = 0;
 
     // ===== Procedural Floor Generation (BSP) =====
     const T = 2, CH = 3.5;
     const WAINSCOT_HEIGHT = 0.9;
     const GW = 21, GH = 17;
+    const FLOOR_LABELS = ['B1', 'B2'];
+    const ROWS = GH, COLS = GW;
+    const OX = -(COLS * T) / 2, OZ = -(ROWS * T) / 2;
     let genRooms = [];
+
+    function t2w(c, r) { return { x: OX + c*T + T/2, z: OZ + r*T + T/2 }; }
+    function w2t(x, z) { return { c: Math.floor((x-OX)/T), r: Math.floor((z-OZ)/T) }; }
+    function isWallOn(map, c, r) { return r<0||r>=ROWS||c<0||c>=COLS||map[r][c]===1; }
 
     function generateFloor() {
       const map = [];
@@ -394,14 +416,96 @@
       return {map, rooms:rms};
     }
 
-    let {map: MAP, rooms: _rms} = generateFloor();
-    genRooms = _rms;
-    let ROWS = MAP.length, COLS = MAP[0].length;
-    const OX = -(COLS * T) / 2, OZ = -(ROWS * T) / 2;
+    function chooseStairTile(map, rooms, spawnRoom) {
+      const roomChoices = rooms
+        .slice(1)
+        .map(room => ({
+          c: room.cx,
+          r: room.cy,
+          dist: Math.abs(room.cx - spawnRoom.cx) + Math.abs(room.cy - spawnRoom.cy)
+        }))
+        .filter(tile => !isWallOn(map, tile.c, tile.r));
+      if (roomChoices.length > 0) {
+        roomChoices.sort((a, b) => b.dist - a.dist);
+        return { c: roomChoices[0].c, r: roomChoices[0].r };
+      }
 
-    function t2w(c, r) { return { x: OX + c*T + T/2, z: OZ + r*T + T/2 }; }
-    function w2t(x, z) { return { c: Math.floor((x-OX)/T), r: Math.floor((z-OZ)/T) }; }
-    function isWall(c, r) { return r<0||r>=ROWS||c<0||c>=COLS||MAP[r][c]===1; }
+      let best = null;
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          if (isWallOn(map, c, r)) continue;
+          const dist = Math.abs(c - spawnRoom.cx) + Math.abs(r - spawnRoom.cy);
+          if (!best || dist > best.dist) best = { c, r, dist };
+        }
+      }
+      return best ? { c: best.c, r: best.r } : { c: spawnRoom.cx, r: spawnRoom.cy };
+    }
+
+    function chooseStairFacing(map, stairTile) {
+      const dirs = [
+        { dc: 0, dr: -1, rot: Math.PI, score: 0 },
+        { dc: 1, dr: 0, rot: -Math.PI / 2, score: 0 },
+        { dc: 0, dr: 1, rot: 0, score: 0 },
+        { dc: -1, dr: 0, rot: Math.PI / 2, score: 0 }
+      ];
+      dirs.forEach(dir => {
+        let score = 0;
+        for (let step = 1; step <= 4; step++) {
+          const c = stairTile.c + dir.dc * step;
+          const r = stairTile.r + dir.dr * step;
+          if (isWallOn(map, c, r)) break;
+          score++;
+        }
+        dir.score = score;
+      });
+      dirs.sort((a, b) => b.score - a.score);
+      return dirs[0];
+    }
+
+    function createFloorData(label) {
+      const { map, rooms } = generateFloor();
+      const spawnRoom = rooms[0];
+      const startTile = t2w(spawnRoom.cx, spawnRoom.cy);
+      const stairTile = chooseStairTile(map, rooms, spawnRoom);
+      const stairFacing = chooseStairFacing(map, stairTile);
+      return {
+        label,
+        map,
+        rooms,
+        spawnRoom,
+        startTile,
+        stairTile,
+        stairFacing,
+        group: null,
+        enemyGroup: null,
+        shadows: [],
+        figures: [],
+        bosses: [],
+        totalGhosts: 0,
+        cleared: false
+      };
+    }
+
+    const floors = FLOOR_LABELS.map(label => createFloorData(label));
+    let currentFloorIndex = 0;
+    let currentFloor = floors[currentFloorIndex];
+    let MAP = currentFloor.map;
+    genRooms = currentFloor.rooms;
+    let spawnRoom = currentFloor.spawnRoom;
+    let startTile = currentFloor.startTile;
+
+    function applyFloorContext(floorState) {
+      currentFloor = floorState;
+      MAP = floorState.map;
+      genRooms = floorState.rooms;
+      spawnRoom = floorState.spawnRoom;
+      startTile = floorState.startTile;
+      shadows = floorState.shadows;
+      figures = floorState.figures;
+      bosses = floorState.bosses;
+    }
+
+    function isWall(c, r) { return isWallOn(MAP, c, r); }
 
     // ===== Scene =====
     const scene = new THREE.Scene();
@@ -410,8 +514,6 @@
     scene.fog = new THREE.FogExp2(0x101820, BASE_FOG_DENSITY);
 
     const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 100);
-    const spawnRoom = genRooms[0];
-    const startTile = t2w(spawnRoom.cx, spawnRoom.cy);
     camera.position.set(startTile.x, 1.6, startTile.z);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -623,93 +725,192 @@
     const ceilMat = new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.95, metalness: 0.0 });
     const boxMat = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.8 });
     const barrelMat = toonMat(0x3a4a3a);
-    const floorGroup = new THREE.Group();
 
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const {x, z} = t2w(c, r);
-        if (isWall(c, r)) {
-          const b = new THREE.Mesh(new THREE.BoxGeometry(T, CH, T), wallMat);
-          b.position.set(x, CH/2, z);
-          b.receiveShadow = true; b.castShadow = true;
-          floorGroup.add(b);
-        } else {
-          const f = new THREE.Mesh(new THREE.PlaneGeometry(T, T), floorMat);
-          f.rotation.x = -Math.PI/2; f.position.set(x, 0, z);
-          f.receiveShadow = true; floorGroup.add(f);
-          const ce = new THREE.Mesh(new THREE.PlaneGeometry(T, T), ceilMat);
-          ce.rotation.x = Math.PI/2; ce.position.set(x, CH, z);
-          ce.receiveShadow = true; floorGroup.add(ce);
+    function removeObject(obj) {
+      if (obj && obj.parent) obj.parent.remove(obj);
+    }
 
-          // Room-themed props: each room may have a dominant type
-          // Determine which room this tile is in
-          let roomIdx = -1;
-          for (let ri = 0; ri < genRooms.length; ri++) {
-            const rm = genRooms[ri];
-            if (c >= rm.x && c < rm.x+rm.w && r >= rm.y && r < rm.y+rm.h) { roomIdx = ri; break; }
+    function makeStaircase(floorState) {
+      const stair = new THREE.Group();
+      const stepMat = new THREE.MeshStandardMaterial({
+        color: 0x50463a,
+        roughness: 0.92,
+        metalness: 0.04
+      });
+      const railMat = new THREE.MeshStandardMaterial({
+        color: 0x2a2c31,
+        roughness: 0.7,
+        metalness: 0.18
+      });
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xc6d0de,
+        transparent: true,
+        opacity: 0.18,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      for (let i = 0; i < 5; i++) {
+        const step = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.18, 0.36), stepMat);
+        step.position.set(0, 0.09 + i * 0.15, 0.44 - i * 0.2);
+        step.castShadow = true;
+        step.receiveShadow = true;
+        stair.add(step);
+      }
+
+      const landing = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.09, 0.5), stepMat);
+      landing.position.set(0, 0.05, 0.72);
+      landing.receiveShadow = true;
+      stair.add(landing);
+
+      for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.84, 1.35), railMat);
+        rail.position.set(side * 0.72, 0.46, 0.14);
+        rail.castShadow = true;
+        stair.add(rail);
+
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.95, 0.07), railMat);
+        post.position.set(side * 0.72, 0.5, 0.74);
+        post.castShadow = true;
+        stair.add(post);
+      }
+
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.25), glowMat);
+      glow.position.set(0, 0.72, -0.05);
+      glow.rotation.x = -Math.PI / 2.8;
+      stair.add(glow);
+
+      const { x, z } = t2w(floorState.stairTile.c, floorState.stairTile.r);
+      stair.position.set(x, 0, z);
+      stair.rotation.y = floorState.stairFacing.rot;
+      return stair;
+    }
+
+    function buildFloorGroup(floorState) {
+      const group = new THREE.Group();
+      const geometryGroup = new THREE.Group();
+      const enemyGroup = new THREE.Group();
+      group.add(geometryGroup);
+      group.add(enemyGroup);
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const { x, z } = t2w(c, r);
+          if (isWallOn(floorState.map, c, r)) {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(T, CH, T), wallMat);
+            b.position.set(x, CH / 2, z);
+            b.receiveShadow = true;
+            b.castShadow = true;
+            geometryGroup.add(b);
+            continue;
           }
-          // Room theme: each room gets a bias (seeded by roomIdx)
+
+          const f = new THREE.Mesh(new THREE.PlaneGeometry(T, T), floorMat);
+          f.rotation.x = -Math.PI / 2;
+          f.position.set(x, 0, z);
+          f.receiveShadow = true;
+          geometryGroup.add(f);
+
+          const ce = new THREE.Mesh(new THREE.PlaneGeometry(T, T), ceilMat);
+          ce.rotation.x = Math.PI / 2;
+          ce.position.set(x, CH, z);
+          ce.receiveShadow = true;
+          geometryGroup.add(ce);
+
+          const isSpawnTile = c === floorState.spawnRoom.cx && r === floorState.spawnRoom.cy;
+          const isStairTile = c === floorState.stairTile.c && r === floorState.stairTile.r;
+          if (isStairTile) {
+            geometryGroup.add(makeStaircase(floorState));
+          }
+          if (isSpawnTile || isStairTile) continue;
+
+          let roomIdx = -1;
+          for (let ri = 0; ri < floorState.rooms.length; ri++) {
+            const rm = floorState.rooms[ri];
+            if (c >= rm.x && c < rm.x + rm.w && r >= rm.y && r < rm.y + rm.h) {
+              roomIdx = ri;
+              break;
+            }
+          }
+
           const roomTheme = roomIdx >= 0 ? (roomIdx * 7 + 3) % 5 : -1;
-          // 0=chairs, 1=boxes, 2=debris, 3=barrels, 4=mixed
           const propRoll = Math.random();
           const inTheme = roomTheme >= 0 && roomTheme < 4;
-          const threshHigh = inTheme ? 0.35 : 0.08; // themed rooms get way more of their type
+          const threshHigh = inTheme ? 0.35 : 0.08;
 
           if (roomTheme === 0 && propRoll < threshHigh) {
-            // Chair room
             const chairMat = toonMat(0x3a2a1a);
             const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.65), chairMat);
             const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.7, 4), chairMat);
             const leg2 = leg1.clone(), leg3 = leg1.clone(), leg4 = leg1.clone();
             const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.05), chairMat);
             const chair = new THREE.Group();
-            seat.position.y = 0.7; back.position.set(0, 1.0, -0.3);
-            leg1.position.set(-0.28, 0.35, -0.25); leg2.position.set(0.28, 0.35, -0.25);
-            leg3.position.set(-0.28, 0.35, 0.25); leg4.position.set(0.28, 0.35, 0.25);
+            seat.position.y = 0.7;
+            back.position.set(0, 1.0, -0.3);
+            leg1.position.set(-0.28, 0.35, -0.25);
+            leg2.position.set(0.28, 0.35, -0.25);
+            leg3.position.set(-0.28, 0.35, 0.25);
+            leg4.position.set(0.28, 0.35, 0.25);
             chair.add(seat, back, leg1, leg2, leg3, leg4);
-            chair.position.set(x+(Math.random()-0.5)*0.6, 0, z+(Math.random()-0.5)*0.6);
-            chair.rotation.set((Math.random()-0.5)*0.5, Math.random()*Math.PI, (Math.random()-0.5)*1.2);
+            chair.position.set(x + (Math.random() - 0.5) * 0.6, 0, z + (Math.random() - 0.5) * 0.6);
+            chair.rotation.set((Math.random() - 0.5) * 0.5, Math.random() * Math.PI, (Math.random() - 0.5) * 1.2);
             chair.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-            floorGroup.add(chair);
-          } else if (roomTheme === 1 && propRoll < threshHigh || (roomTheme !== 0 && propRoll < 0.08)) {
-            // Box
-            const s = 0.3 + Math.random()*0.5;
-            const bx = new THREE.Mesh(new THREE.BoxGeometry(s,s,s), boxMat);
-            bx.position.set(x+(Math.random()-0.5)*0.8, s/2, z+(Math.random()-0.5)*0.8);
-            bx.rotation.y = Math.random()*Math.PI;
-            bx.castShadow = true; bx.receiveShadow = true;
-            floorGroup.add(bx);
-          } else if (roomTheme === 2 && propRoll < threshHigh || propRoll < 0.14) {
-            // Debris
+            geometryGroup.add(chair);
+          } else if ((roomTheme === 1 && propRoll < threshHigh) || (roomTheme !== 0 && propRoll < 0.08)) {
+            const s = 0.3 + Math.random() * 0.5;
+            const bx = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), boxMat);
+            bx.position.set(x + (Math.random() - 0.5) * 0.8, s / 2, z + (Math.random() - 0.5) * 0.8);
+            bx.rotation.y = Math.random() * Math.PI;
+            bx.castShadow = true;
+            bx.receiveShadow = true;
+            geometryGroup.add(bx);
+          } else if ((roomTheme === 2 && propRoll < threshHigh) || propRoll < 0.14) {
             const debrisMat = toonMat(0x2a2520);
-            for (let d = 0; d < 3 + Math.floor(Math.random()*3); d++) {
-              const ds = 0.05 + Math.random()*0.15;
-              const debris = new THREE.Mesh(new THREE.BoxGeometry(ds, ds*0.5, ds*0.8), debrisMat);
-              debris.position.set(x+(Math.random()-0.5)*0.6, ds*0.25, z+(Math.random()-0.5)*0.6);
-              debris.rotation.set(Math.random(), Math.random()*Math.PI, Math.random()*0.3);
-              debris.castShadow = true; debris.receiveShadow = true;
-              floorGroup.add(debris);
+            for (let d = 0; d < 3 + Math.floor(Math.random() * 3); d++) {
+              const ds = 0.05 + Math.random() * 0.15;
+              const debris = new THREE.Mesh(new THREE.BoxGeometry(ds, ds * 0.5, ds * 0.8), debrisMat);
+              debris.position.set(x + (Math.random() - 0.5) * 0.6, ds * 0.25, z + (Math.random() - 0.5) * 0.6);
+              debris.rotation.set(Math.random(), Math.random() * Math.PI, Math.random() * 0.3);
+              debris.castShadow = true;
+              debris.receiveShadow = true;
+              geometryGroup.add(debris);
             }
-          } else if (roomTheme === 3 && propRoll < threshHigh || propRoll < 0.17) {
-            // Barrel
+          } else if ((roomTheme === 3 && propRoll < threshHigh) || propRoll < 0.17) {
             const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.9, 8), barrelMat);
-            barrel.position.set(x+(Math.random()-0.5)*0.6, 0.45, z+(Math.random()-0.5)*0.6);
-            if (Math.random() < 0.3) barrel.rotation.x = Math.PI/2 + (Math.random()-0.5)*0.3;
-            barrel.castShadow = true; barrel.receiveShadow = true;
-            floorGroup.add(barrel);
+            barrel.position.set(x + (Math.random() - 0.5) * 0.6, 0.45, z + (Math.random() - 0.5) * 0.6);
+            if (Math.random() < 0.3) barrel.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+            barrel.castShadow = true;
+            barrel.receiveShadow = true;
+            geometryGroup.add(barrel);
           } else if (propRoll < 0.19) {
-            // Pipe
             const pipeMat = toonMat(0x444444);
             const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6), pipeMat);
             pipe.position.set(x, 0.04, z);
-            pipe.rotation.z = Math.PI/2;
+            pipe.rotation.z = Math.PI / 2;
             pipe.castShadow = true;
-            floorGroup.add(pipe);
+            geometryGroup.add(pipe);
           }
         }
       }
+
+      floorState.group = group;
+      floorState.enemyGroup = enemyGroup;
+      group.visible = false;
+      scene.add(group);
     }
-    scene.add(floorGroup);
+
+    floors.forEach(buildFloorGroup);
+
+    function setCurrentFloor(index) {
+      currentFloorIndex = index;
+      floors.forEach((floor, floorIndex) => {
+        if (floor.group) floor.group.visible = floorIndex === index;
+      });
+      applyFloorContext(floors[index]);
+    }
+
+    setCurrentFloor(0);
 
     function canMove(x, z) {
       const m = 0.3;
@@ -737,14 +938,33 @@
         + bosses.filter(b => b.alive).length;
     }
 
+    function countAliveEnemiesForFloor(floorState) {
+      return floorState.shadows.filter(s => s.alive).length
+        + floorState.figures.filter(f => f.alive).length
+        + floorState.bosses.filter(b => b.alive).length;
+    }
+
+    function countAliveEnemiesTotal() {
+      return floors.reduce((sum, floorState) => sum + countAliveEnemiesForFloor(floorState), 0);
+    }
+
+    function clearFloorEnemies(floorState) {
+      floorState.shadows.forEach(s => {
+        removeObject(s.mesh);
+        removeObject(s.shell);
+      });
+      floorState.figures.forEach(f => removeObject(f.group));
+      floorState.bosses.forEach(b => b.segments.forEach(seg => removeObject(seg)));
+      floorState.shadows = [];
+      floorState.figures = [];
+      floorState.bosses = [];
+      floorState.totalGhosts = 0;
+      floorState.cleared = false;
+    }
+
     function clearActiveEnemies() {
-      shadows.forEach(s => { if (s.mesh.parent) scene.remove(s.mesh); });
-      shadows.forEach(s => { if (s.shell && s.shell.parent) scene.remove(s.shell); });
-      figures.forEach(f => { if (f.group.parent) scene.remove(f.group); });
-      bosses.forEach(b => b.segments.forEach(seg => { if (seg.parent) scene.remove(seg); }));
-      shadows = [];
-      figures = [];
-      bosses = [];
+      floors.forEach(clearFloorEnemies);
+      applyFloorContext(currentFloor);
     }
 
     function nearestThreatDistance(from) {
@@ -761,7 +981,6 @@
     }
 
     // ===== Shadow Figures (destroyable 3D ghosts) =====
-    let figures = [];
 
     function findFigurePhaseTarget(origin, avoidPos) {
       const start = w2t(origin.x, origin.z);
@@ -1001,7 +1220,7 @@
         this.alive = true;
         this.hp = 0.8;
         this.hitTimer = 0;
-        scene.add(this.group);
+        currentFloor.enemyGroup.add(this.group);
       }
       get mesh() { return this.group; } // for position reference
       startPhaseShift(playerPos) {
@@ -1071,7 +1290,7 @@
           mats.forEach(m => { m.opacity *= 0.92; });
           this.visual.scale.multiplyScalar(0.992);
           if (t < 1) requestAnimationFrame(fade);
-          else scene.remove(this.group);
+          else removeObject(this.group);
         };
         fade();
         score++;
@@ -1086,6 +1305,7 @@
       const seen = new Set();
       const push = (bucket, c, r, jitter) => {
         if (isWall(c, r)) return;
+        if (c === currentFloor.stairTile.c && r === currentFloor.stairTile.r) return;
         const key = `${c},${r}`;
         if (seen.has(key)) return;
         const distFromSpawn = Math.abs(c - spawnRoom.cx) + Math.abs(r - spawnRoom.cy);
@@ -1462,8 +1682,8 @@
         this.fleeing = false; this.fleeTarget = null;
         this.speed = 3.0 + Math.random()*1.0;
 
-        scene.add(this.shell);
-        scene.add(this.mesh);
+        currentFloor.enemyGroup.add(this.shell);
+        currentFloor.enemyGroup.add(this.mesh);
       }
 
       update(dt, playerPos, playerDir) {
@@ -1586,16 +1806,16 @@
               depthWrite: false
             }));
           p.position.copy(this.mesh.position); p.quaternion.copy(this.mesh.quaternion);
-          scene.add(p);
+          if (this.mesh.parent) this.mesh.parent.add(p);
           const v = new THREE.Vector3((Math.random()-0.5)*2,(Math.random()-0.5)*2,(Math.random()-0.5)*2);
           let t = 0;
           const go = () => { t+=0.016; p.position.add(v.clone().multiplyScalar(0.016));
             p.material.opacity=0.6*(1-t/0.8); p.scale.setScalar(1+t*2);
-            if(t<0.8) requestAnimationFrame(go); else scene.remove(p); };
+            if(t<0.8) requestAnimationFrame(go); else removeObject(p); };
           go();
         }
-        scene.remove(this.shell);
-        scene.remove(this.mesh);
+        removeObject(this.shell);
+        removeObject(this.mesh);
         score++;
       }
     }
@@ -1806,7 +2026,6 @@
       return clampTexture(tex);
     }
 
-    let bosses = [];
     const BOSS_TYPES = {
       snake: { segments:14, headSize:0.45, taper:0.85, speed:1.2, hp:4, color:0xe5eeff },
       lizard:{ segments:10, headSize:0.5, taper:0.8, speed:0.8, hp:5, color:0xe6f4ea, legs:true },
@@ -1851,7 +2070,9 @@
           const seg=new THREE.Mesh(geo,sm);
           seg.position.copy(sp).add(this.moveDir.clone().multiplyScalar(-i*sz*1.5));
           seg.position.add(n.clone().multiplyScalar(0.03));
-          seg.quaternion.copy(q); scene.add(seg); this.segments.push(seg);
+          seg.quaternion.copy(q);
+          currentFloor.enemyGroup.add(seg);
+          this.segments.push(seg);
           this.tintMaterials.push(sm);
         }
         // Head eyes
@@ -1948,7 +2169,7 @@
           const v=new THREE.Vector3((Math.random()-0.5)*3,Math.random()*2,(Math.random()-0.5)*3);
           let t=0;const go=()=>{t+=0.016;seg.position.add(v.clone().multiplyScalar(0.016));
           seg.material.opacity*=0.95;seg.scale.setScalar(seg.scale.x*0.98);
-          if(t<1.5)requestAnimationFrame(go);else scene.remove(seg);};
+          if(t<1.5)requestAnimationFrame(go);else removeObject(seg);};
           setTimeout(()=>go(),i*50);
         });
         score+=5;
@@ -2119,11 +2340,13 @@
     const clearTitleBtn = document.getElementById('clear-title');
     const pauseResumeBtn = document.getElementById('pause-resume');
     const pauseQuitBtn = document.getElementById('pause-quit');
+    const floorNameEl = document.getElementById('floor-name');
     const shadowCountEl = document.getElementById('shadow-count');
     const purifiedCountEl = document.getElementById('purified-count');
     const flashChargeEl = document.getElementById('flash-charge');
     const flashOverlay = document.getElementById('flash-overlay');
     const dreadOverlay = document.getElementById('dread-overlay');
+    const stairsPromptEl = document.getElementById('stairs-prompt');
     const instructionsEl = document.getElementById('instructions');
     const ghostAnnounceEl = document.getElementById('ghost-announce');
     const ghostAnnounceTextEl = document.getElementById('ghost-announce-text');
@@ -2201,9 +2424,36 @@
     });
 
     // ===== Game Flow =====
-    function showGhostAnnouncement() {
+    function getLinkedFloorIndex(index = currentFloorIndex) {
+      return (index + 1) % floors.length;
+    }
+
+    function currentStairWorld() {
+      return t2w(currentFloor.stairTile.c, currentFloor.stairTile.r);
+    }
+
+    function isNearCurrentStairs() {
+      const stairPos = currentStairWorld();
+      return Math.hypot(camera.position.x - stairPos.x, camera.position.z - stairPos.z) < 1.35;
+    }
+
+    function updateStairsPrompt() {
+      if (!gameStarted || floorCleared || pauseOpen || stairUseCooldown > 0 || !isNearCurrentStairs()) {
+        stairsPromptEl.style.opacity = '0';
+        stairsPromptEl.textContent = '';
+        return;
+      }
+      stairsPromptEl.textContent = `E: 階段で ${floors[getLinkedFloorIndex()].label} へ`;
+      stairsPromptEl.style.opacity = '1';
+    }
+
+    function showGhostAnnouncement(floorState = currentFloor) {
       clearTimeout(ghostAnnounceTimer);
-      ghostAnnounceTextEl.textContent = `ここには ${totalGhosts} 体のゴーストがいる……`;
+      if (floorState.cleared) {
+        ghostAnnounceTextEl.textContent = `${floorState.label} はすでに浄化されている……`;
+      } else {
+        ghostAnnounceTextEl.textContent = `${floorState.label} には ${floorState.totalGhosts} 体のゴーストがいる……`;
+      }
       ghostAnnounceEl.style.display = 'flex';
       ghostAnnounceTimer = window.setTimeout(() => {
         ghostAnnounceEl.style.display = 'none';
@@ -2227,13 +2477,41 @@
       let remainder = encounterGhostCount - countAliveEnemies();
       if (remainder > 0) remainder -= spawnFigures(remainder);
       if (remainder > 0) spawnShadows(remainder);
-      totalGhosts = countAliveEnemies();
+      currentFloor.totalGhosts = countAliveEnemies();
+      currentFloor.cleared = false;
+    }
+
+    function prepareEncounterForFloor(floorState) {
+      applyFloorContext(floorState);
+      floorState.shadows = [];
+      floorState.figures = [];
+      floorState.bosses = [];
+      floorState.totalGhosts = 0;
+      floorState.cleared = false;
+      applyFloorContext(floorState);
+      spawnEncounter();
+    }
+
+    function switchFloor(targetIndex) {
+      setCurrentFloor(targetIndex);
+      const arrival = currentStairWorld();
+      const facing = currentFloor.stairFacing;
+      stairUseCooldown = 0.45;
+      camera.position.set(
+        arrival.x + facing.dc * 0.55,
+        1.6,
+        arrival.z + facing.dr * 0.55
+      );
+      updateHUD();
+      drawMinimap();
+      showGhostAnnouncement(currentFloor);
     }
 
     function returnToTitle() {
       clearTimeout(ghostAnnounceTimer);
       stopWhisperBGM(0.9);
       clearActiveEnemies();
+      setCurrentFloor(0);
       gameStarted = false;
       floorCleared = false;
       pauseOpen = false;
@@ -2243,6 +2521,7 @@
       batteryLife = 1.0;
       totalGhosts = 0;
       ambienceTime = 0;
+      stairUseCooldown = 0;
       isMoving = false;
       lastClickTime = 0;
       camera.position.set(startTile.x, 1.6, startTile.z);
@@ -2262,6 +2541,7 @@
       flashlight.penumbra = FLASHLIGHT_BASE_PENUMBRA;
       mmCanvas.style.opacity = '1';
       instructionsEl.style.opacity = '1';
+      stairsPromptEl.style.opacity = '0';
       updateHUD();
       drawMinimap();
       if (document.pointerLockElement === renderer.domElement) {
@@ -2281,6 +2561,9 @@
     function startRun() {
       clearTimeout(ghostAnnounceTimer);
       clearActiveEnemies();
+      floors.forEach(prepareEncounterForFloor);
+      totalGhosts = floors.reduce((sum, floorState) => sum + floorState.totalGhosts, 0);
+      setCurrentFloor(0);
       gameStarted = true;
       floorCleared = false;
       pauseOpen = false;
@@ -2289,6 +2572,7 @@
       flashTimer = 0;
       batteryLife = 1.0;
       ambienceTime = 0;
+      stairUseCooldown = 0;
       isMoving = false;
       lastClickTime = 0;
       camera.position.set(startTile.x, 1.6, startTile.z);
@@ -2309,9 +2593,10 @@
       flashlight.penumbra = FLASHLIGHT_BASE_PENUMBRA;
       mmCanvas.style.opacity = '1';
       instructionsEl.style.opacity = '1';
-      spawnEncounter();
+      stairsPromptEl.style.opacity = '0';
       updateHUD();
-      showGhostAnnouncement();
+      drawMinimap();
+      showGhostAnnouncement(currentFloor);
       try { startWhisperBGM(); } catch (e) {}
       renderer.domElement.requestPointerLock();
     }
@@ -2337,20 +2622,27 @@
       returnToTitle();
     });
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape') return;
-      if (pauseOpen) {
-        e.preventDefault();
-        returnToTitle();
+      if (e.key === 'Escape') {
+        if (pauseOpen) {
+          e.preventDefault();
+          returnToTitle();
+          return;
+        }
+        if (gameStarted && !floorCleared && !isPointerLocked) {
+          e.preventDefault();
+          returnToTitle();
+        }
         return;
       }
-      if (gameStarted && !floorCleared && !isPointerLocked) {
+      if ((e.key === 'e' || e.key === 'E') && gameStarted && !floorCleared && !pauseOpen && stairUseCooldown <= 0 && isNearCurrentStairs()) {
         e.preventDefault();
-        returnToTitle();
+        switchFloor(getLinkedFloorIndex());
       }
     });
 
     function updateHUD() {
-      const alive = countAliveEnemies();
+      const alive = countAliveEnemiesTotal();
+      floorNameEl.textContent = `FLOOR: ${currentFloor.label}`;
       shadowCountEl.textContent = `REMAINING: ${alive}`;
       if (gameStarted && totalGhosts > 0) {
         const purified = Math.max(0, totalGhosts - alive);
@@ -2363,11 +2655,14 @@
     }
 
     function checkClear() {
-      if (floorCleared || countAliveEnemies() !== 0) return;
+      if (floorCleared) return;
+      if (!currentFloor.cleared && countAliveEnemies() === 0) currentFloor.cleared = true;
+      if (!floors.every(floorState => floorState.cleared)) return;
       floorCleared = true;
       const t = ((performance.now()-startTime)/1000).toFixed(1);
       clearStats.textContent = `${totalGhosts} ghosts cleared / ${t}s / SCORE ${score}`;
       clearScreen.style.display = 'flex';
+      stairsPromptEl.style.opacity = '0';
       stopWhisperBGM(1.6);
       if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
     }
@@ -2382,7 +2677,8 @@
     function drawMinimap() {
       mmCtx.fillStyle = '#111'; mmCtx.fillRect(0,0,mmCanvas.width,mmCanvas.height);
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-        mmCtx.fillStyle = isWall(c,r) ? '#444' : '#222';
+        if (c === currentFloor.stairTile.c && r === currentFloor.stairTile.r) mmCtx.fillStyle = '#5d6f8d';
+        else mmCtx.fillStyle = isWall(c,r) ? '#444' : '#222';
         mmCtx.fillRect(c*mmScale, r*mmScale, mmScale, mmScale);
       }
       // Player dot
@@ -2399,6 +2695,7 @@
       const dt = Math.min(clock.getDelta(), 0.05);
       if (gameStarted && !floorCleared && !pauseOpen) {
         ambienceTime += dt;
+        stairUseCooldown = Math.max(0, stairUseCooldown - dt);
         if (isMoving && isPointerLocked) {
           const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
           dir.y = 0; dir.normalize();
@@ -2444,8 +2741,11 @@
         shadows.forEach(s => s.update(dt, camera.position, pDir));
         figures.forEach(f => f.update(dt, camera.position));
         bosses.forEach(b => b.update(dt));
-        updateHUD(); checkClear(); drawMinimap();
+        updateHUD(); checkClear(); drawMinimap(); updateStairsPrompt();
         if ((performance.now()-startTime)/1000 > 5) instructionsEl.style.opacity = '0';
+      } else {
+        stairUseCooldown = Math.max(0, stairUseCooldown - dt);
+        stairsPromptEl.style.opacity = '0';
       }
       renderer.render(scene, camera);
     }
