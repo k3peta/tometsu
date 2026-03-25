@@ -301,7 +301,8 @@
     // ===== Game State =====
     const MIN_GHOST_COUNT = 10;
     const MAX_GHOST_COUNT = 18;
-    const BASE_WALL_GHOST_COUNT = 6;
+    const MIN_WALL_GHOST_COUNT = 2;
+    const MAX_WALL_GHOST_COUNT = 4;
     let gameStarted = false, isPointerLocked = false, isMoving = false;
     let flashCharge = 1.0, shadows = [], score = 0, startTime = 0;
     let batteryLife = 1.0; // 1.0 = full, decays to 0.3 over time
@@ -2172,12 +2173,20 @@
 
     function spawnEncounter() {
       const encounterGhostCount = MIN_GHOST_COUNT + Math.floor(Math.random() * (MAX_GHOST_COUNT - MIN_GHOST_COUNT + 1));
-      const bossCount = encounterGhostCount >= 15 && Math.random() < 0.38 ? 2 : 1;
-      const wallGhostCount = Math.min(BASE_WALL_GHOST_COUNT, Math.max(3, Math.floor(encounterGhostCount * 0.4)));
+      const wallGhostCount = THREE.MathUtils.clamp(
+        Math.round(encounterGhostCount * 0.22),
+        MIN_WALL_GHOST_COUNT,
+        MAX_WALL_GHOST_COUNT
+      );
+      const remainingCount = encounterGhostCount - wallGhostCount;
+      const desiredBossCount = Math.max(2, Math.floor(remainingCount / 2));
+      const desiredFigureCount = remainingCount - desiredBossCount;
       spawnShadows(wallGhostCount);
-      const spawnedBosses = spawnBosses(bossCount);
-      spawnFigures(encounterGhostCount - wallGhostCount - spawnedBosses);
-      const remainder = encounterGhostCount - countAliveEnemies();
+      const spawnedBosses = spawnBosses(desiredBossCount);
+      const figureTarget = desiredFigureCount + Math.max(0, desiredBossCount - spawnedBosses);
+      spawnFigures(figureTarget);
+      let remainder = encounterGhostCount - countAliveEnemies();
+      if (remainder > 0) remainder -= spawnFigures(remainder);
       if (remainder > 0) spawnShadows(remainder);
       totalGhosts = countAliveEnemies();
     }
