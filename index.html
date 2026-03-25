@@ -2494,14 +2494,20 @@
 
     function switchFloor(targetIndex) {
       setCurrentFloor(targetIndex);
-      const arrival = currentStairWorld();
       const facing = currentFloor.stairFacing;
+      const exitTile = {
+        c: currentFloor.stairTile.c + facing.dc,
+        r: currentFloor.stairTile.r + facing.dr
+      };
+      const arrival = isWallOn(currentFloor.map, exitTile.c, exitTile.r)
+        ? currentStairWorld()
+        : t2w(exitTile.c, exitTile.r);
       stairUseCooldown = 0.45;
       isMoving = false;
       camera.position.set(
-        arrival.x + facing.dc * 0.55,
+        arrival.x,
         1.6,
-        arrival.z + facing.dr * 0.55
+        arrival.z
       );
       updateHUD();
       drawMinimap();
