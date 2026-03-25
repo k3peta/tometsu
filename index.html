@@ -2107,8 +2107,8 @@
       const placed = [];
       let girlsPlaced = 0;
       let bigHeadsPlaced = 0;
-      const girlTarget = count >= 3 ? Math.max(1, Math.round(count * 0.28)) : 0;
-      const bigHeadTarget = count >= 4 ? Math.max(1, Math.round(count * 0.18)) : 0;
+      const girlTarget = count >= 3 ? Math.max(1, Math.round(count * 0.42)) : 0;
+      const bigHeadTarget = count >= 4 ? Math.max(1, Math.round(count * 0.24)) : 0;
       for (const cand of candidates) {
         if (placed.length >= count) break;
         if (placed.some(p => Math.abs(p.c - cand.c) <= 1 && Math.abs(p.r - cand.r) <= 1)) continue;
@@ -2116,8 +2116,8 @@
         const spawnX = x + (Math.random() - 0.5) * cand.jitter;
         const spawnZ = z + (Math.random() - 0.5) * cand.jitter;
         const spawnRot = Math.random() * Math.PI * 2;
-        const useGirl = girlsPlaced < girlTarget && (placed.length === 0 || Math.random() < 0.45);
-        const useBigHead = !useGirl && bigHeadsPlaced < bigHeadTarget && Math.random() < 0.42;
+        const useGirl = girlsPlaced < girlTarget && (placed.length === 0 || Math.random() < 0.62);
+        const useBigHead = !useGirl && bigHeadsPlaced < bigHeadTarget && Math.random() < 0.5;
         figures.push(
           useGirl ? new ShadowGirlGhost(spawnX, spawnZ, spawnRot)
           : useBigHead ? new ShadowBigHeadGhost(spawnX, spawnZ, spawnRot)
@@ -3323,7 +3323,7 @@
         MAX_WALL_GHOST_COUNT
       );
       const remainingCount = encounterGhostCount - wallGhostCount;
-      const desiredBossCount = Math.max(2, Math.floor(remainingCount / 2));
+      const desiredBossCount = Math.max(1, Math.round(remainingCount * 0.34));
       const desiredFigureCount = remainingCount - desiredBossCount;
       spawnShadows(wallGhostCount);
       const spawnedBosses = spawnBosses(desiredBossCount);
