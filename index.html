@@ -470,6 +470,7 @@
       const stairFacing = chooseStairFacing(map, stairTile);
       return {
         label,
+        stairKind: label === 'B1' ? 'down' : 'up',
         map,
         rooms,
         spawnRoom,
@@ -737,6 +738,11 @@
         roughness: 0.92,
         metalness: 0.04
       });
+      const treadLineMat = new THREE.MeshStandardMaterial({
+        color: 0x867661,
+        roughness: 0.88,
+        metalness: 0.02
+      });
       const railMat = new THREE.MeshStandardMaterial({
         color: 0x2a2c31,
         roughness: 0.7,
@@ -750,34 +756,69 @@
         blending: THREE.AdditiveBlending,
         depthWrite: false
       });
+      const shaftMat = new THREE.MeshBasicMaterial({
+        color: 0x040506,
+        transparent: true,
+        opacity: 0.92
+      });
+      const shaftGlowMat = new THREE.MeshBasicMaterial({
+        color: 0x91a0b5,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const isDown = floorState.stairKind === 'down';
 
       for (let i = 0; i < 5; i++) {
         const step = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.18, 0.36), stepMat);
-        step.position.set(0, 0.09 + i * 0.15, 0.44 - i * 0.2);
+        const stepY = isDown ? 0.81 - i * 0.15 : 0.09 + i * 0.15;
+        step.position.set(0, stepY, 0.44 - i * 0.2);
         step.castShadow = true;
         step.receiveShadow = true;
         stair.add(step);
+
+        const treadLine = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.02, 0.03), treadLineMat);
+        treadLine.position.set(0, stepY + 0.08, 0.57 - i * 0.2);
+        treadLine.receiveShadow = true;
+        stair.add(treadLine);
       }
 
       const landing = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.09, 0.5), stepMat);
-      landing.position.set(0, 0.05, 0.72);
+      landing.position.set(0, isDown ? 0.82 : 0.05, 0.72);
       landing.receiveShadow = true;
       stair.add(landing);
 
       for (const side of [-1, 1]) {
         const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.84, 1.35), railMat);
-        rail.position.set(side * 0.72, 0.46, 0.14);
+        rail.position.set(side * 0.72, isDown ? 0.56 : 0.46, 0.14);
         rail.castShadow = true;
         stair.add(rail);
 
         const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.95, 0.07), railMat);
-        post.position.set(side * 0.72, 0.5, 0.74);
+        post.position.set(side * 0.72, isDown ? 0.92 : 0.5, 0.74);
         post.castShadow = true;
         stair.add(post);
       }
 
+      if (isDown) {
+        const shaft = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.92, 0.96), shaftMat);
+        shaft.position.set(0, 0.28, -0.3);
+        stair.add(shaft);
+
+        const shaftGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.24, 1.02), shaftGlowMat);
+        shaftGlow.position.set(0, 0.36, -0.74);
+        stair.add(shaftGlow);
+      } else {
+        const topCap = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.08, 0.24), stepMat);
+        topCap.position.set(0, 0.82, -0.44);
+        topCap.receiveShadow = true;
+        stair.add(topCap);
+      }
+
       const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.25), glowMat);
-      glow.position.set(0, 0.72, -0.05);
+      glow.position.set(0, isDown ? 0.84 : 0.72, -0.05);
       glow.rotation.x = -Math.PI / 2.8;
       stair.add(glow);
 
