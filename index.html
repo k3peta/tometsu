@@ -3509,12 +3509,12 @@
       scareAudioClock += dt;
       const now = audioCtx.currentTime;
       const cue = nearestThreatCue(playerPos, playerDir);
-      const whisperLevel = 0.018 + dread * 0.05 + proximityFear * 0.035;
-      const droneLevel = 0.01 + dread * 0.028;
-      const airLevel = 0.004 + proximityFear * 0.025;
-      const pulse = 0.6 + Math.sin(ambienceTime * 0.33 + dread * 2.4) * 0.18;
+      const whisperLevel = 0.16 + dread * 0.12 + proximityFear * 0.09;
+      const droneLevel = 0.02 + dread * 0.04;
+      const airLevel = 0.012 + proximityFear * 0.03;
+      const pulse = 0.88 + Math.sin(ambienceTime * 0.33 + dread * 2.4) * 0.12;
 
-      bgmGain.gain.setTargetAtTime(0.08 + dread * 0.055, now, 0.9);
+      bgmGain.gain.setTargetAtTime(0.15 + dread * 0.06, now, 0.9);
       bgmLayers.whisperGain.gain.setTargetAtTime(whisperLevel * pulse, now, 0.7);
       bgmLayers.droneGain.gain.setTargetAtTime(droneLevel, now, 1.1);
       bgmLayers.airGain.gain.setTargetAtTime(airLevel, now, 0.45);
@@ -3542,7 +3542,7 @@
         const now = audioCtx.currentTime;
         bgmGain.gain.cancelScheduledValues(now);
         bgmGain.gain.setValueAtTime(Math.max(0.0001, bgmGain.gain.value), now);
-        bgmGain.gain.linearRampToValueAtTime(0.1, now + 0.9);
+        bgmGain.gain.linearRampToValueAtTime(0.16, now + 0.9);
         return;
       }
       const sr = audioCtx.sampleRate;
@@ -3569,7 +3569,7 @@
       }
       rev.buffer = rb;
       const whisperGain = audioCtx.createGain();
-      whisperGain.gain.value = 0.028;
+      whisperGain.gain.value = 0.18;
 
       const airHigh = audioCtx.createBiquadFilter();
       airHigh.type = 'highpass';
@@ -3579,14 +3579,14 @@
       airBand.frequency.value = 1700;
       airBand.Q.value = 1.1;
       const airGain = audioCtx.createGain();
-      airGain.gain.value = 0.005;
+      airGain.gain.value = 0.012;
 
       const droneMix = audioCtx.createGain();
       const droneFilter = audioCtx.createBiquadFilter();
       droneFilter.type = 'lowpass';
       droneFilter.frequency.value = 180;
       const droneGain = audioCtx.createGain();
-      droneGain.gain.value = 0.012;
+      droneGain.gain.value = 0.02;
 
       const oscA = audioCtx.createOscillator();
       oscA.type = 'sine';
@@ -3660,7 +3660,7 @@
           bgmLayers = null;
         }
       };
-      master.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 1.2);
+      master.gain.linearRampToValueAtTime(0.16, audioCtx.currentTime + 1.2);
     }
 
     function stopWhisperBGM(fadeOut = 1.4) {
