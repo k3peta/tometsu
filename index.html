@@ -1134,118 +1134,177 @@
       const tex = makeCanvas(384, 512, (ctx, w, h) => {
         ctx.clearRect(0, 0, w, h);
         const cx = w / 2;
-        const skullShift = (Math.random() - 0.5) * 18;
-        const shroudW = 92 + Math.random() * 28;
-        const shoulderY = 172 + Math.random() * 12;
-        const chinY = 140 + Math.random() * 10;
-        const hemY = 482 + Math.random() * 10;
+        const skullShift = (Math.random() - 0.5) * 14;
+        const faceCX = cx + skullShift;
+        const faceTop = 72 + Math.random() * 8;
+        const faceBottom = 236 + Math.random() * 8;
+        const templeWidth = 56 + Math.random() * 8;
+        const jawWidth = 70 + Math.random() * 10;
+        const cheekY = 150 + Math.random() * 8;
+        const shoulderY = 198 + Math.random() * 14;
+        const hemY = 484 + Math.random() * 10;
+        const shroudW = 100 + Math.random() * 24;
 
-        const aura = ctx.createRadialGradient(cx, 220, 30, cx, 220, 200);
-        aura.addColorStop(0, 'rgba(222,232,252,0.26)');
-        aura.addColorStop(0.45, 'rgba(184,198,228,0.15)');
+        const aura = ctx.createRadialGradient(cx, 214, 18, cx, 214, 214);
+        aura.addColorStop(0, 'rgba(248,252,255,0.30)');
+        aura.addColorStop(0.26, 'rgba(220,232,255,0.22)');
+        aura.addColorStop(0.58, 'rgba(176,190,230,0.14)');
         aura.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = aura;
         ctx.beginPath();
-        ctx.ellipse(cx, 240, 150, 220, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, 232, 164, 228, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        const form = ctx.createLinearGradient(0, 40, 0, hemY);
-        form.addColorStop(0, 'rgba(236,244,255,0)');
-        form.addColorStop(0.12, 'rgba(236,242,255,0.88)');
-        form.addColorStop(0.48, 'rgba(196,208,230,0.74)');
-        form.addColorStop(0.85, 'rgba(146,156,180,0.30)');
-        form.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = form;
+        const shroud = ctx.createLinearGradient(0, 58, 0, hemY);
+        shroud.addColorStop(0, 'rgba(246,248,255,0)');
+        shroud.addColorStop(0.12, 'rgba(242,246,255,0.72)');
+        shroud.addColorStop(0.42, 'rgba(210,220,242,0.66)');
+        shroud.addColorStop(0.78, 'rgba(150,162,192,0.30)');
+        shroud.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = shroud;
         ctx.beginPath();
-        ctx.moveTo(cx + skullShift - 36, chinY);
-        ctx.bezierCurveTo(cx - shroudW * 0.62, 120, cx - shroudW - 24, shoulderY, cx - shroudW, shoulderY + 28);
-        ctx.bezierCurveTo(cx - shroudW + 8, 302, cx - shroudW + 4, 390, cx - shroudW + 30, hemY);
-        ctx.quadraticCurveTo(cx - 22, hemY + 14, cx, hemY - 8);
-        ctx.quadraticCurveTo(cx + 24, hemY + 14, cx + shroudW - 28, hemY);
-        ctx.bezierCurveTo(cx + shroudW - 4, 394, cx + shroudW - 4, 302, cx + shroudW, shoulderY + 22);
-        ctx.bezierCurveTo(cx + shroudW - 12, shoulderY - 10, cx + shroudW * 0.56, 120, cx + skullShift + 34, chinY);
+        ctx.moveTo(faceCX - 26, faceBottom - 10);
+        ctx.bezierCurveTo(cx - shroudW * 0.64, 138, cx - shroudW - 24, shoulderY, cx - shroudW, shoulderY + 34);
+        ctx.bezierCurveTo(cx - shroudW + 10, 304, cx - shroudW + 8, 390, cx - shroudW + 36, hemY);
+        ctx.quadraticCurveTo(cx - 18, hemY + 14, cx, hemY - 6);
+        ctx.quadraticCurveTo(cx + 20, hemY + 12, cx + shroudW - 32, hemY);
+        ctx.bezierCurveTo(cx + shroudW - 6, 396, cx + shroudW - 4, 302, cx + shroudW, shoulderY + 28);
+        ctx.bezierCurveTo(cx + shroudW - 14, 138, cx + shroudW * 0.64, 122, faceCX + 24, faceBottom - 10);
         ctx.closePath();
         ctx.fill();
 
-        const skull = ctx.createRadialGradient(cx + skullShift, 118, 10, cx + skullShift, 128, 72);
-        skull.addColorStop(0, 'rgba(255,255,255,0.48)');
-        skull.addColorStop(0.22, 'rgba(232,238,250,0.22)');
-        skull.addColorStop(0.68, 'rgba(108,120,148,0.16)');
-        skull.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = skull;
+        const faceGlow = ctx.createRadialGradient(faceCX, 150, 16, faceCX, 158, 112);
+        faceGlow.addColorStop(0, 'rgba(255,255,255,0.62)');
+        faceGlow.addColorStop(0.28, 'rgba(244,248,255,0.34)');
+        faceGlow.addColorStop(0.68, 'rgba(172,188,222,0.16)');
+        faceGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = faceGlow;
         ctx.beginPath();
-        ctx.ellipse(cx + skullShift, 126, 58, 76, -0.05, 0, Math.PI * 2);
+        ctx.ellipse(faceCX, 156, 78, 104, -0.02, 0, Math.PI * 2);
         ctx.fill();
 
-        const veil = ctx.createLinearGradient(cx, 62, cx, 220);
-        veil.addColorStop(0, 'rgba(246,248,255,0.22)');
-        veil.addColorStop(0.4, 'rgba(206,214,232,0.12)');
-        veil.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = veil;
+        const faceMask = ctx.createLinearGradient(0, faceTop, 0, faceBottom);
+        faceMask.addColorStop(0, 'rgba(255,255,255,0.92)');
+        faceMask.addColorStop(0.18, 'rgba(246,249,255,0.76)');
+        faceMask.addColorStop(0.44, 'rgba(208,220,244,0.36)');
+        faceMask.addColorStop(0.82, 'rgba(126,138,170,0.12)');
+        faceMask.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = faceMask;
         ctx.beginPath();
-        ctx.moveTo(cx + skullShift - 68, 74);
-        ctx.quadraticCurveTo(cx + skullShift - 90, 144, cx + skullShift - 28, 210);
-        ctx.quadraticCurveTo(cx + skullShift, 226, cx + skullShift + 24, 210);
-        ctx.quadraticCurveTo(cx + skullShift + 88, 138, cx + skullShift + 62, 70);
+        ctx.moveTo(faceCX, faceTop);
+        ctx.bezierCurveTo(faceCX - templeWidth, faceTop + 10, faceCX - jawWidth, cheekY, faceCX - 42, faceBottom);
+        ctx.quadraticCurveTo(faceCX, faceBottom + 20, faceCX + 42, faceBottom);
+        ctx.bezierCurveTo(faceCX + jawWidth, cheekY, faceCX + templeWidth, faceTop + 10, faceCX, faceTop);
         ctx.closePath();
         ctx.fill();
 
-        const eyeY = 132;
-        for (const ex of [cx + skullShift - 24, cx + skullShift + 24]) {
+        const brow = ctx.createLinearGradient(0, faceTop + 14, 0, faceTop + 84);
+        brow.addColorStop(0, 'rgba(112,124,158,0.18)');
+        brow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = brow;
+        ctx.beginPath();
+        ctx.moveTo(faceCX - 58, faceTop + 34);
+        ctx.quadraticCurveTo(faceCX, faceTop + 6, faceCX + 58, faceTop + 34);
+        ctx.quadraticCurveTo(faceCX, faceTop + 60, faceCX - 58, faceTop + 34);
+        ctx.fill();
+
+        const cheekShadow = ctx.createRadialGradient(faceCX, 182, 12, faceCX, 182, 86);
+        cheekShadow.addColorStop(0, 'rgba(0,0,0,0)');
+        cheekShadow.addColorStop(0.62, 'rgba(52,62,88,0.08)');
+        cheekShadow.addColorStop(1, 'rgba(88,102,138,0.14)');
+        ctx.fillStyle = cheekShadow;
+        ctx.beginPath();
+        ctx.ellipse(faceCX, 186, 68, 50, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const eyeY = 138;
+        for (const ex of [faceCX - 28, faceCX + 28]) {
+          const socketAura = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, 26);
+          socketAura.addColorStop(0, 'rgba(255,255,255,0.16)');
+          socketAura.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = socketAura;
+          ctx.beginPath();
+          ctx.ellipse(ex, eyeY, 20, 28, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(18,22,32,0.80)';
+          ctx.beginPath();
+          ctx.ellipse(ex, eyeY + 2, 12, 18, 0, 0, Math.PI * 2);
+          ctx.fill();
+
           if (closedEyes) {
-            ctx.strokeStyle = 'rgba(120,132,166,0.26)';
-            ctx.lineWidth = 2.4;
+            ctx.strokeStyle = 'rgba(184,196,224,0.40)';
+            ctx.lineWidth = 2.8;
             ctx.beginPath();
-            ctx.moveTo(ex - 16, eyeY);
-            ctx.quadraticCurveTo(ex, eyeY + 6, ex + 16, eyeY);
+            ctx.moveTo(ex - 16, eyeY + 1);
+            ctx.quadraticCurveTo(ex, eyeY + 8, ex + 16, eyeY + 1);
             ctx.stroke();
           } else {
-            const socket = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, 20);
-            socket.addColorStop(0, 'rgba(250,252,255,0.34)');
-            socket.addColorStop(0.4, 'rgba(220,228,244,0.14)');
-            socket.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = socket;
+            const pupilGlow = ctx.createRadialGradient(ex, eyeY - 4, 0, ex, eyeY - 4, 10);
+            pupilGlow.addColorStop(0, 'rgba(238,246,255,0.42)');
+            pupilGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = pupilGlow;
             ctx.beginPath();
-            ctx.ellipse(ex, eyeY, 16, 22, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = 'rgba(28,32,42,0.34)';
-            ctx.beginPath();
-            ctx.ellipse(ex, eyeY + 2, 7, 11, 0, 0, Math.PI * 2);
+            ctx.ellipse(ex, eyeY - 4, 7, 10, 0, 0, Math.PI * 2);
             ctx.fill();
           }
         }
 
-        ctx.fillStyle = 'rgba(196,206,230,0.12)';
+        const noseShadow = ctx.createLinearGradient(0, 144, 0, 212);
+        noseShadow.addColorStop(0, 'rgba(188,198,224,0.08)');
+        noseShadow.addColorStop(0.4, 'rgba(36,42,58,0.26)');
+        noseShadow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = noseShadow;
         ctx.beginPath();
-        ctx.moveTo(cx + skullShift, 148);
-        ctx.lineTo(cx + skullShift - 9, 178);
-        ctx.lineTo(cx + skullShift + 8, 178);
+        ctx.moveTo(faceCX, 152);
+        ctx.lineTo(faceCX - 11, 188);
+        ctx.lineTo(faceCX + 10, 188);
         ctx.closePath();
         ctx.fill();
 
-        const mouthY = 206 + Math.random() * 10;
+        ctx.fillStyle = 'rgba(12,16,24,0.36)';
+        ctx.beginPath();
+        ctx.ellipse(faceCX - 8, 190, 4, 7, -0.15, 0, Math.PI * 2);
+        ctx.ellipse(faceCX + 8, 190, 4, 7, 0.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        const mouthY = 210 + Math.random() * 8;
         if (closedEyes) {
-          ctx.strokeStyle = 'rgba(150,160,184,0.16)';
-          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(170,180,208,0.24)';
+          ctx.lineWidth = 2.6;
           ctx.beginPath();
-          ctx.moveTo(cx + skullShift - 16, mouthY);
-          ctx.quadraticCurveTo(cx + skullShift, mouthY + 6, cx + skullShift + 16, mouthY);
+          ctx.moveTo(faceCX - 22, mouthY);
+          ctx.quadraticCurveTo(faceCX, mouthY + 8, faceCX + 22, mouthY);
           ctx.stroke();
         } else {
-          const maw = ctx.createRadialGradient(cx + skullShift, mouthY, 0, cx + skullShift, mouthY, 26);
-          maw.addColorStop(0, 'rgba(240,244,255,0.22)');
+          const maw = ctx.createRadialGradient(faceCX, mouthY + 6, 0, faceCX, mouthY + 6, 34);
+          maw.addColorStop(0, 'rgba(198,210,238,0.18)');
+          maw.addColorStop(0.55, 'rgba(38,42,58,0.24)');
           maw.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = maw;
           ctx.beginPath();
-          ctx.ellipse(cx + skullShift, mouthY, 18, 28, 0, 0, Math.PI * 2);
+          ctx.ellipse(faceCX, mouthY + 6, 22, 30, 0, 0, Math.PI * 2);
           ctx.fill();
+
+          ctx.fillStyle = 'rgba(14,18,26,0.74)';
+          ctx.beginPath();
+          ctx.ellipse(faceCX, mouthY + 8, 13, 20, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(236,242,255,0.18)';
+          ctx.lineWidth = 1.4;
+          for (let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(faceCX + i * 5, mouthY - 2);
+            ctx.lineTo(faceCX + i * 4, mouthY + 18);
+            ctx.stroke();
+          }
         }
 
         ctx.strokeStyle = 'rgba(226,234,248,0.09)';
         for (let i = 0; i < 8; i++) {
-          const sx = cx + (Math.random() - 0.5) * 82;
-          const sy = 188 + Math.random() * 180;
+          const sx = cx + (Math.random() - 0.5) * 92;
+          const sy = 208 + Math.random() * 168;
           ctx.lineWidth = 1 + Math.random() * 0.6;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
@@ -1262,7 +1321,7 @@
 
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < 10; i++) {
           const cutX = cx - shroudW * 0.85 + Math.random() * shroudW * 1.7;
           const cutY = hemY - 18 + Math.random() * 16;
           ctx.beginPath();
@@ -1274,17 +1333,24 @@
         }
         ctx.restore();
 
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 14; i++) {
           const wx = cx + (Math.random() - 0.5) * 160;
-          const wy = 160 + Math.random() * 260;
+          const wy = 132 + Math.random() * 286;
           const glow = ctx.createRadialGradient(wx, wy, 0, wx, wy, 18 + Math.random() * 22);
-          glow.addColorStop(0, `rgba(214,224,246,${0.10 + Math.random() * 0.08})`);
+          glow.addColorStop(0, `rgba(230,238,252,${0.10 + Math.random() * 0.10})`);
           glow.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
           ctx.arc(wx, wy, 18 + Math.random() * 18, 0, Math.PI * 2);
           ctx.fill();
         }
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(faceCX - 38, faceTop + 18);
+        ctx.quadraticCurveTo(faceCX, faceTop - 6, faceCX + 38, faceTop + 18);
+        ctx.stroke();
       });
       return clampTexture(tex);
     }
