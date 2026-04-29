@@ -61,6 +61,17 @@
       opacity: 0.14;
       transition: opacity 0.15s;
     }
+    #encounter-shock {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 6;
+      opacity: 0;
+      background:
+        radial-gradient(circle at 50% 52%, rgba(255,255,255,0.18), rgba(255,255,255,0.02) 12%, rgba(0,0,0,0) 24%),
+        radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 18%, rgba(45,0,0,0.24) 54%, rgba(0,0,0,0.88) 100%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, rgba(0,0,0,0) 1px 4px);
+      mix-blend-mode: screen;
+      transition: opacity 0.08s;
+    }
     #instructions {
       position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
       color: #888; font-family: 'Courier New', monospace; font-size: 13px;
@@ -338,6 +349,7 @@
   <div id="crosshair"></div>
   <div id="flash-overlay"></div>
   <div id="dread-overlay"></div>
+  <div id="encounter-shock"></div>
   <div id="stairs-prompt"></div>
   <div id="instructions">クリック長押し: 移動 ｜ ダブルクリック: フラッシュ ｜ Esc: 中断</div>
   <canvas id="minimap" width="210" height="170"></canvas>
@@ -360,6 +372,7 @@
     let flashTimer = 0, floorCleared = false, totalGhosts = 0, ghostAnnounceTimer = 0;
     let ambienceTime = 0, pauseOpen = false, suppressPauseOnUnlock = false;
     let stairUseCooldown = 0;
+    let encounterShockTimer = 0, encounterShockCooldown = 0, cameraKick = 0;
 
     // ===== Procedural Floor Generation (BSP) =====
     const T = 2, CH = 3.5;
@@ -483,6 +496,8 @@
         figures: [],
         bosses: [],
         totalGhosts: 0,
+        graffitiTriggered: false,
+        graffitiObjects: [],
         cleared: false
       };
     }
@@ -540,6 +555,28 @@
       tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.needsUpdate = true;
       return tex;
+    }
+
+    function makeNoiseBumpTexture(size = 256, contrast = 1) {
+      return makeCanvas(size, size, (ctx, w, h) => {
+        const img = ctx.createImageData(w, h);
+        for (let i = 0; i < img.data.length; i += 4) {
+          const grain = 112 + (Math.random() - 0.5) * 120 * contrast;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = THREE.MathUtils.clamp(grain, 0, 255);
+          img.data[i + 3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
+        ctx.globalAlpha = 0.42;
+        ctx.strokeStyle = '#ffffff';
+        for (let i = 0; i < 24; i++) {
+          ctx.beginPath();
+          const x = Math.random() * w, y = Math.random() * h;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + (Math.random() - 0.5) * 90, y + (Math.random() - 0.5) * 90);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      });
     }
 
     function shuffleInPlace(arr) {
@@ -719,22 +756,153 @@
       ctx.strokeRect(4, h/2-2, w-8, 4);
     });
 
+    const wallBumpTex = makeNoiseBumpTexture(256, 1.15);
+    const floorBumpTex = makeNoiseBumpTexture(256, 0.95);
+    const ceilBumpTex = makeNoiseBumpTexture(256, 0.75);
     wallTex.repeat.set(1, 1); floorTex.repeat.set(1, 1); ceilTex.repeat.set(1, 1);
+    wallBumpTex.repeat.set(1, 1); floorBumpTex.repeat.set(1, 1); ceilBumpTex.repeat.set(1, 1);
 
-    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, metalness: 0.0 });
-    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85, metalness: 0.0 });
-    const ceilMat = new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.95, metalness: 0.0 });
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallBumpTex, bumpScale: 0.09, roughness: 0.96, metalness: 0.0 });
+    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, bumpMap: floorBumpTex, bumpScale: 0.055, roughness: 0.92, metalness: 0.0 });
+    const ceilMat = new THREE.MeshStandardMaterial({ map: ceilTex, bumpMap: ceilBumpTex, bumpScale: 0.04, roughness: 0.98, metalness: 0.0 });
     const boxMat = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.8 });
     const barrelMat = toonMat(0x3a4a3a);
 
+    const GRAFFITI_WORDS = [
+      'MASSACRE',
+      'NO EXIT',
+      'STILL HERE',
+      'LOOK BEHIND',
+      "DON'T BREATHE",
+      'THE LIGHT LIES',
+      'WE REMAIN'
+    ];
+
+    function makeGraffitiTexture(text) {
+      const tex = makeCanvas(1024, 384, (ctx, w, h) => {
+        ctx.clearRect(0, 0, w, h);
+        ctx.translate(w / 2, h / 2);
+        ctx.rotate((Math.random() - 0.5) * 0.08);
+        ctx.translate(-w / 2, -h / 2);
+
+        const mainColor = Math.random() < 0.6 ? 'rgba(92,6,8,0.92)' : 'rgba(210,212,198,0.74)';
+        const shadowColor = 'rgba(0,0,0,0.62)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `900 ${text.length > 10 ? 104 : 128}px Impact, Arial Black, sans-serif`;
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+
+        for (let i = 0; i < 18; i++) {
+          ctx.strokeStyle = `rgba(0,0,0,${0.03 + Math.random() * 0.04})`;
+          ctx.lineWidth = 4 + Math.random() * 12;
+          ctx.beginPath();
+          const y = 64 + Math.random() * (h - 128);
+          ctx.moveTo(100 + Math.random() * 70, y);
+          ctx.bezierCurveTo(320, y + (Math.random() - 0.5) * 70, 680, y + (Math.random() - 0.5) * 80, 920 - Math.random() * 70, y + (Math.random() - 0.5) * 44);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = shadowColor;
+        ctx.lineWidth = 18;
+        ctx.strokeText(text, w / 2 + 8, h / 2 + 8);
+        ctx.strokeStyle = mainColor;
+        ctx.lineWidth = 9;
+        ctx.strokeText(text, w / 2, h / 2);
+        ctx.fillStyle = mainColor;
+        ctx.fillText(text, w / 2, h / 2);
+
+        for (let i = 0; i < text.length * 3; i++) {
+          const x = 150 + Math.random() * 724;
+          const y = h / 2 + 34 + Math.random() * 70;
+          const len = 20 + Math.random() * 90;
+          const alpha = 0.18 + Math.random() * 0.34;
+          ctx.strokeStyle = mainColor.replace(/[\d.]+\)$/, `${alpha})`);
+          ctx.lineWidth = 4 + Math.random() * 9;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.bezierCurveTo(x - 6 + Math.random() * 12, y + len * 0.35, x + 10 - Math.random() * 20, y + len * 0.7, x + (Math.random() - 0.5) * 12, y + len);
+          ctx.stroke();
+        }
+
+        ctx.globalCompositeOperation = 'destination-out';
+        for (let i = 0; i < 160; i++) {
+          ctx.fillStyle = `rgba(0,0,0,${0.08 + Math.random() * 0.28})`;
+          ctx.beginPath();
+          ctx.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      });
+      return clampTexture(tex);
+    }
+
     function removeObject(obj) {
       if (obj && obj.parent) obj.parent.remove(obj);
+    }
+
+    function clearGraffiti(floorState) {
+      floorState.graffitiObjects.forEach(removeObject);
+      floorState.graffitiObjects = [];
+      floorState.graffitiTriggered = false;
+    }
+
+    function findGraffitiWallFaces(floorState) {
+      const faces = [];
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          if (!isWallOn(floorState.map, c, r)) continue;
+          const { x, z } = t2w(c, r);
+          const options = [
+            { c: c - 1, r, x: x - T / 2 - 0.012, z, nx: -1, nz: 0 },
+            { c: c + 1, r, x: x + T / 2 + 0.012, z, nx: 1, nz: 0 },
+            { c, r: r - 1, x, z: z - T / 2 - 0.012, nx: 0, nz: -1 },
+            { c, r: r + 1, x, z: z + T / 2 + 0.012, nx: 0, nz: 1 }
+          ];
+          options.forEach(face => {
+            if (!isWallOn(floorState.map, face.c, face.r)) faces.push(face);
+          });
+        }
+      }
+      return faces;
+    }
+
+    function spawnGraffiti(floorState) {
+      if (floorState.graffitiTriggered || !floorState.group) return;
+      const faces = findGraffitiWallFaces(floorState)
+        .filter(face => Math.hypot(face.x - camera.position.x, face.z - camera.position.z) > 4.2);
+      const pool = shuffleInPlace(faces.length ? faces : findGraffitiWallFaces(floorState));
+      if (!pool.length) return;
+      floorState.graffitiTriggered = true;
+      const count = Math.min(3, Math.max(1, pool.length));
+      for (let i = 0; i < count; i++) {
+        const face = pool[i];
+        const word = i === 0 ? 'MASSACRE' : GRAFFITI_WORDS[Math.floor(Math.random() * GRAFFITI_WORDS.length)];
+        const mat = new THREE.MeshBasicMaterial({
+          map: makeGraffitiTexture(word),
+          transparent: true,
+          opacity: 0.88,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          alphaTest: 0.02
+        });
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(i === 0 ? 3.35 : 2.55, i === 0 ? 1.28 : 0.96), mat);
+        plane.position.set(face.x, 1.74 + (Math.random() - 0.5) * 0.22, face.z);
+        plane.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(face.nx, 0, face.nz));
+        plane.rotation.z = (Math.random() - 0.5) * 0.08;
+        floorState.group.add(plane);
+        floorState.graffitiObjects.push(plane);
+      }
+      triggerEncounterShock(0.85);
+      if (audioCtx && bgmLayers) triggerWhisperCue((Math.random() - 0.5) * 1.5, 1);
     }
 
     function makeStaircase(floorState) {
       const stair = new THREE.Group();
       const stepMat = new THREE.MeshStandardMaterial({
         color: 0x50463a,
+        bumpMap: floorBumpTex,
+        bumpScale: 0.035,
         roughness: 0.92,
         metalness: 0.04
       });
@@ -783,6 +951,19 @@
         treadLine.position.set(0, stepY + 0.08, 0.57 - i * 0.2);
         treadLine.receiveShadow = true;
         stair.add(treadLine);
+
+        const stain = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.9 + Math.random() * 0.24, 0.16 + Math.random() * 0.08),
+          new THREE.MeshBasicMaterial({
+            color: 0x090706,
+            transparent: true,
+            opacity: 0.24 + Math.random() * 0.18,
+            depthWrite: false
+          })
+        );
+        stain.rotation.x = -Math.PI / 2;
+        stain.position.set((Math.random() - 0.5) * 0.14, stepY + 0.094, 0.45 - i * 0.2);
+        stair.add(stain);
       }
 
       const landing = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.09, 0.5), stepMat);
@@ -800,6 +981,15 @@
         post.position.set(side * 0.72, isDown ? 0.92 : 0.5, 0.74);
         post.castShadow = true;
         stair.add(post);
+
+        const rust = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.16, 0.09), new THREE.MeshStandardMaterial({
+          color: 0x4b2419,
+          roughness: 1,
+          metalness: 0.02
+        }));
+        rust.position.set(side * 0.72, isDown ? 0.74 : 0.38, 0.52);
+        rust.castShadow = true;
+        stair.add(rust);
       }
 
       if (isDown) {
@@ -996,6 +1186,7 @@
       });
       floorState.figures.forEach(f => removeObject(f.group));
       floorState.bosses.forEach(b => b.segments.forEach(seg => removeObject(seg)));
+      clearGraffiti(floorState);
       floorState.shadows = [];
       floorState.figures = [];
       floorState.bosses = [];
@@ -1308,6 +1499,19 @@
         ctx.ellipse(cx + headTilt, 188, 10, 16, 0, 0, Math.PI * 2);
         ctx.fill();
 
+        ctx.strokeStyle = 'rgba(20,10,12,0.38)';
+        ctx.lineWidth = 2;
+        for (const sx of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + headTilt + sx * 10, 160);
+          ctx.bezierCurveTo(cx + headTilt + sx * 18, 178, cx + headTilt + sx * 16, 202, cx + headTilt + sx * 24, 226);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.36)';
+        ctx.beginPath();
+        ctx.ellipse(cx + headTilt, 150, 34, 52, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         const dress = ctx.createLinearGradient(0, shoulderY, 0, hemY);
         dress.addColorStop(0, 'rgba(236,242,255,0.04)');
         dress.addColorStop(0.14, 'rgba(226,234,252,0.84)');
@@ -1561,6 +1765,13 @@
         ctx.beginPath();
         ctx.ellipse(faceCx, 188, 9, 14, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0,0,0,0.42)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(faceCx - 30, 126);
+        ctx.bezierCurveTo(faceCx - 12, 134, faceCx + 8, 134, faceCx + 30, 126);
+        ctx.stroke();
 
         const robe = ctx.createLinearGradient(0, shoulderY, 0, hemY);
         robe.addColorStop(0, 'rgba(238,242,255,0.04)');
@@ -3825,6 +4036,7 @@
     const flashChargeEl = document.getElementById('flash-charge');
     const flashOverlay = document.getElementById('flash-overlay');
     const dreadOverlay = document.getElementById('dread-overlay');
+    const encounterShockEl = document.getElementById('encounter-shock');
     const stairsPromptEl = document.getElementById('stairs-prompt');
     const instructionsEl = document.getElementById('instructions');
     const ghostAnnounceEl = document.getElementById('ghost-announce');
@@ -3854,14 +4066,19 @@
       if (flashCharge < 0.3) return;
       flashCharge -= 0.3;
       flashTimer = 0.24;
+      cameraKick = Math.max(cameraKick, 0.55);
       flashOverlay.style.background = 'rgba(255,255,220,0.5)';
       const fd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+      let flashHits = 0;
       shadows.forEach(s => {
         if (!s.alive) return;
         const ts = s.mesh.position.clone().sub(camera.position);
         const d = ts.length(); if (d > 12) return;
         ts.normalize();
-        if (fd.angleTo(ts) < Math.PI/5 && hasLineOfSight(camera.position, s.mesh.position)) s.hit(0.6*(1-d/12));
+        if (fd.angleTo(ts) < Math.PI/5 && hasLineOfSight(camera.position, s.mesh.position)) {
+          s.hit(0.6*(1-d/12));
+          flashHits++;
+        }
       });
       // Also hit figures
       figures.forEach(f => {
@@ -3869,7 +4086,10 @@
         const ts = f.group.position.clone().sub(camera.position);
         const d = ts.length(); if (d > 12) return;
         ts.normalize();
-        if (fd.angleTo(ts) < Math.PI/5 && hasLineOfSight(camera.position, f.group.position)) f.hit(0.5*(1-d/12));
+        if (fd.angleTo(ts) < Math.PI/5 && hasLineOfSight(camera.position, f.group.position)) {
+          f.hit(0.5*(1-d/12));
+          flashHits++;
+        }
       });
       // Also hit bosses (head)
       bosses.forEach(b => {
@@ -3877,8 +4097,26 @@
         const ts = b.segments[0].position.clone().sub(camera.position);
         const d = ts.length(); if (d > 12) return;
         ts.normalize();
-        if (fd.angleTo(ts) < Math.PI/4 && hasLineOfSight(camera.position, b.segments[0].position)) b.hit(0.4*(1-d/12));
+        if (fd.angleTo(ts) < Math.PI/4 && hasLineOfSight(camera.position, b.segments[0].position)) {
+          b.hit(0.4*(1-d/12));
+          flashHits++;
+        }
       });
+      if (flashHits > 0) {
+        cameraKick = Math.max(cameraKick, 0.85);
+        encounterShockTimer = Math.max(encounterShockTimer, 0.14);
+        flashOverlay.style.background = 'rgba(255,245,230,0.68)';
+      }
+    }
+
+    function triggerEncounterShock(intensity = 1) {
+      encounterShockTimer = Math.max(encounterShockTimer, 0.22 + intensity * 0.18);
+      encounterShockCooldown = 1.6 + intensity * 1.2;
+      cameraKick = Math.max(cameraKick, 0.75 + intensity * 0.35);
+      if (audioCtx && bgmLayers) {
+        triggerWhisperCue((Math.random() - 0.5) * 1.4, 0.9);
+        triggerFootstepCue((Math.random() - 0.5) * 1.2, 0.85);
+      }
     }
 
     // Pointer Lock
@@ -3977,6 +4215,7 @@
       if (remainder > 0) remainder -= spawnFigures(remainder);
       if (remainder > 0) spawnShadows(remainder);
       currentFloor.totalGhosts = countAliveEnemies();
+      currentFloor.graffitiTriggered = false;
       currentFloor.cleared = false;
     }
 
@@ -3986,6 +4225,7 @@
       floorState.figures = [];
       floorState.bosses = [];
       floorState.totalGhosts = 0;
+      clearGraffiti(floorState);
       floorState.cleared = false;
       applyFloorContext(floorState);
       spawnEncounter();
@@ -4028,6 +4268,9 @@
       totalGhosts = 0;
       ambienceTime = 0;
       stairUseCooldown = 0;
+      encounterShockTimer = 0;
+      encounterShockCooldown = 0;
+      cameraKick = 0;
       isMoving = false;
       lastClickTime = 0;
       camera.position.set(startTile.x, 1.6, startTile.z);
@@ -4038,6 +4281,9 @@
       ghostAnnounceEl.style.display = 'none';
       flashOverlay.style.background = 'rgba(255,255,220,0)';
       dreadOverlay.style.opacity = '0.12';
+      encounterShockEl.style.opacity = '0';
+      renderer.domElement.style.transform = '';
+      renderer.domElement.style.filter = '';
       scene.fog.density = BASE_FOG_DENSITY;
       ambientLight.intensity = BASE_AMBIENT_INTENSITY;
       moon.intensity = BASE_MOON_INTENSITY;
@@ -4079,6 +4325,9 @@
       batteryLife = 1.0;
       ambienceTime = 0;
       stairUseCooldown = 0;
+      encounterShockTimer = 0;
+      encounterShockCooldown = 0;
+      cameraKick = 0;
       isMoving = false;
       lastClickTime = 0;
       camera.position.set(startTile.x, 1.6, startTile.z);
@@ -4090,6 +4339,9 @@
       ghostAnnounceEl.style.display = 'none';
       flashOverlay.style.background = 'rgba(255,255,220,0)';
       dreadOverlay.style.opacity = '0.12';
+      encounterShockEl.style.opacity = '0';
+      renderer.domElement.style.transform = '';
+      renderer.domElement.style.filter = '';
       scene.fog.density = BASE_FOG_DENSITY;
       ambientLight.intensity = BASE_AMBIENT_INTENSITY;
       moon.intensity = BASE_MOON_INTENSITY;
@@ -4156,6 +4408,21 @@
       flashChargeEl.textContent = `FLASH: ${'█'.repeat(bars)}${'░'.repeat(12-bars)}`;
     }
 
+    function checkMidpointGraffiti() {
+      if (!gameStarted || floorCleared || currentFloor.graffitiTriggered || currentFloor.totalGhosts <= 1) return;
+      const alive = countAliveEnemies();
+      const cleared = currentFloor.totalGhosts - alive;
+      if (cleared >= Math.ceil(currentFloor.totalGhosts * 0.5)) {
+        spawnGraffiti(currentFloor);
+        ghostAnnounceTextEl.textContent = '壁に、今まで無かった文字が浮かび上がった……';
+        ghostAnnounceEl.style.display = 'flex';
+        clearTimeout(ghostAnnounceTimer);
+        ghostAnnounceTimer = window.setTimeout(() => {
+          ghostAnnounceEl.style.display = 'none';
+        }, 3200);
+      }
+    }
+
     function checkClear() {
       if (floorCleared) return;
       if (!currentFloor.cleared && countAliveEnemies() === 0) currentFloor.cleared = true;
@@ -4213,6 +4480,10 @@
         batteryLife = Math.max(BATTERY_MIN_LIFE, batteryLife - dt * ((1 - BATTERY_MIN_LIFE) / 120));
         const nearestThreat = nearestThreatDistance(camera.position);
         const proximityFear = Number.isFinite(nearestThreat) ? Math.max(0, 1 - nearestThreat / 9.5) : 0;
+        encounterShockCooldown = Math.max(0, encounterShockCooldown - dt);
+        if (Number.isFinite(nearestThreat) && nearestThreat < 2.25 && encounterShockCooldown <= 0) {
+          triggerEncounterShock(THREE.MathUtils.clamp(1 - nearestThreat / 2.25, 0.35, 1));
+        }
         const batteryFear = Math.max(0, (1 - batteryLife) / (1 - BATTERY_MIN_LIFE));
         const dread = Math.min(1, proximityFear * 0.78 + batteryFear * 0.55);
         const reachFade = Math.pow(batteryFear, 1.15);
@@ -4227,6 +4498,17 @@
         moon.intensity = BASE_MOON_INTENSITY - dread * 0.12;
         scene.fog.density = BASE_FOG_DENSITY + dread * 0.016 + batteryFear * 0.004 + Math.sin(ambienceTime * 1.1) * 0.0012 * proximityFear;
         dreadOverlay.style.opacity = (0.12 + dread * 0.28 + batteryFear * 0.05 + Math.max(0, Math.sin(ambienceTime * 2.4)) * 0.02 * proximityFear).toFixed(2);
+        encounterShockTimer = Math.max(0, encounterShockTimer - dt);
+        cameraKick = Math.max(0, cameraKick - dt * 1.7);
+        const shock = encounterShockTimer > 0 ? Math.min(1, encounterShockTimer / 0.26) : 0;
+        encounterShockEl.style.opacity = (shock * (0.22 + proximityFear * 0.42)).toFixed(2);
+        const shake = cameraKick * (0.5 + proximityFear * 0.7);
+        renderer.domElement.style.transform = shake > 0.01
+          ? `translate(${Math.sin(ambienceTime * 77) * shake * 2.2}px, ${Math.cos(ambienceTime * 61) * shake * 1.6}px)`
+          : '';
+        renderer.domElement.style.filter = dread > 0.55 || shock > 0.05
+          ? `contrast(${1 + dread * 0.16 + shock * 0.18}) saturate(${1 - dread * 0.18}) brightness(${1 - dread * 0.08})`
+          : '';
         flashlight.distance = beamDistance;
         flashlight.angle = Math.max(FLASHLIGHT_MIN_ANGLE * 0.92, beamAngle - dread * 0.05);
         flashlight.penumbra = THREE.MathUtils.clamp(FLASHLIGHT_BASE_PENUMBRA - reachFade * 0.09 + dread * 0.04, 0.08, 0.34);
@@ -4247,11 +4529,14 @@
         shadows.forEach(s => s.update(dt, camera.position, pDir));
         figures.forEach(f => f.update(dt, camera.position, pDir));
         bosses.forEach(b => b.update(dt));
-        updateHUD(); checkClear(); drawMinimap(); updateStairsPrompt();
+        updateHUD(); checkMidpointGraffiti(); checkClear(); drawMinimap(); updateStairsPrompt();
         if ((performance.now()-startTime)/1000 > 5) instructionsEl.style.opacity = '0';
       } else {
         stairUseCooldown = Math.max(0, stairUseCooldown - dt);
         stairsPromptEl.style.opacity = '0';
+        encounterShockEl.style.opacity = '0';
+        renderer.domElement.style.transform = '';
+        renderer.domElement.style.filter = '';
       }
       renderer.render(scene, camera);
     }
